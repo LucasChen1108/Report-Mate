@@ -1,0 +1,419 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Define the shared TypeScript schema type": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565709
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213577319
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214017364
+      }
+    ],
+    "1.2 Define the Go schema representation": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565747
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213578714
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214018680
+      }
+    ],
+    "2.1 Implement `Validate` and `ValidationError`": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565768
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214252950
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214529785
+      }
+    ],
+    "3.1 Add the `report_templates` migration": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565790
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213579745
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214019630
+      }
+    ],
+    "3.2 Implement the `Store` interface and CRUD": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565812
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214559506
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214768076
+      }
+    ],
+    "4.1 Implement `RequireRole` RBAC middleware": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565832
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213580450
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214020514
+      }
+    ],
+    "4.2 Implement the templates HTTP handlers and routes": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565851
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214776773
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215014423
+      }
+    ],
+    "5.1 Author and insert 2–3 seed templates": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565869
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215022514
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215338013
+      }
+    ],
+    "6. Checkpoint - backend complete": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565888
+      }
+    ],
+    "7.1 Set up the Vite React + TypeScript project": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565907
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214253854
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214531279
+      }
+    ],
+    "7.2 Implement the typed API client": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565925
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214560905
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214766154
+      }
+    ],
+    "8.1 Implement `builderReducer` and `BuilderAction`": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565945
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214561600
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214767269
+      }
+    ],
+    "9. Checkpoint - contract and reducer proven": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565964
+      }
+    ],
+    "10.1 Implement TemplateBuilderPage, DndContext, and FieldPalette": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213565984
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214777449
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215015186
+      }
+    ],
+    "10.2 Implement SectionList, SectionCard, FieldList, and FieldCard with dnd wiring": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566004
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215023623
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215337043
+      }
+    ],
+    "10.3 Implement section add/delete flows": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566023
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215344834
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215557419
+      }
+    ],
+    "10.4 Implement FieldPropertyEditor and OptionListEditor": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566043
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215562567
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215829978
+      }
+    ],
+    "11.1 Implement SaveBar and save/update flow": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566066
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215837669
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789216056338
+      }
+    ],
+    "11.2 Implement TemplateListPage and open flow": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566084
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215838968
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789216057175
+      }
+    ],
+    "11.3 Implement the frontend RBAC route guard": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566106
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215839758
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789216058143
+      }
+    ],
+    "12.1 Implement responsive, high-contrast, large-tap-target styles": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566124
+      },
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789216064025
+      },
+      {
+        "executionId": "7b4b2839-f691-4dd5-9557-9a191ed2e05f",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789217199544
+      }
+    ],
+    "13. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789213566141
+      }
+    ],
+    "1. Establish the shared Template Schema contract": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214018707
+      }
+    ],
+    "2. Implement the backend schema validator": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214529806
+      }
+    ],
+    "7. Scaffold the frontend project and API client": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214766181
+      }
+    ],
+    "8. Implement the pure builder reducer": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214767291
+      }
+    ],
+    "3. Implement the database migration and store": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789214768097
+      }
+    ],
+    "4. Implement RBAC middleware and HTTP handlers": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215014450
+      }
+    ],
+    "5. Provide seed templates": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215338035
+      }
+    ],
+    "10. Build the dnd-kit editor UI": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789215830004
+      }
+    ],
+    "11. Implement save/edit/list flows and the route guard": [
+      {
+        "executionId": "0049bebc-d416-4b91-b7ac-a8b48d533897",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789216058168
+      }
+    ],
+    "12. Apply mobile-first, high-contrast styling": [
+      {
+        "executionId": "7b4b2839-f691-4dd5-9557-9a191ed2e05f",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1789217199580
+      }
+    ]
+  }
+}
