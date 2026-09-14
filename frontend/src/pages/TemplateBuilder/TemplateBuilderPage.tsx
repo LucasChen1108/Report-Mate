@@ -31,7 +31,7 @@
 //   - 12.x: mobile-first high-contrast styling.
 //   - 10.5 / 11.4 / 11.5: tests.
 
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -122,12 +122,20 @@ interface TemplateBuilderPageProps {
   // When opened on an existing template, its id. Presence flips save from
   // create (Req 5.1) to update (Req 5.3). Absent for a brand-new template.
   initialTemplateId?: string;
+  // Optional observers so a host shell can watch the live working schema/name
+  // (e.g. to preview the in-progress template in the Report Renderer without a
+  // backend round-trip). Both are optional and default to no-ops, so existing
+  // callers are unaffected.
+  onSchemaChange?: (schema: TemplateSchema) => void;
+  onNameChange?: (name: string) => void;
 }
 
 export function TemplateBuilderPage({
   initialSchema,
   initialName = "",
   initialTemplateId,
+  onSchemaChange,
+  onNameChange,
 }: TemplateBuilderPageProps) {
   const [schema, rawDispatch] = useReducer(
     builderReducer,
@@ -147,6 +155,16 @@ export function TemplateBuilderPage({
   const [saving, setSaving] = useState(false);
   // What the SaveBar surfaces: nothing, a brief saved indicator, or an error.
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ kind: "idle" });
+
+  // Notify an optional host shell whenever the committed schema/name change, so
+  // it can mirror the live template (e.g. preview it in the Report Renderer).
+  // Effects fire after commit, so these always reflect the current state.
+  useEffect(() => {
+    onSchemaChange?.(schema);
+  }, [schema, onSchemaChange]);
+  useEffect(() => {
+    onNameChange?.(name);
+  }, [name, onNameChange]);
 
   // Any schema mutation marks the editor dirty and clears a stale saved
   // indicator (a fresh edit means there are unsaved changes again).
