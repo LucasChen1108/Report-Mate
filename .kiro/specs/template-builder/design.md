@@ -16,6 +16,8 @@ This design covers three surfaces:
 
 The `Field_Type` union has **six** members: `text`, `number`, `select`, `checklist`, `photo`, and `signature`. `signature` is a distinct capture type (a signature pad) and is treated exactly like the other non-option types — it carries a stable id, a label, and a `required` flag, but no options list. Only `select` and `checklist` carry an `options` list. This mirrors real-world field-service report templates (SafetyCulture, ServiceTitan, GoAudits, Appenate), which uniformly include a distinct signature/sign-off capture.
 
+Every Field also carries an optional **`allowMultiple`** boolean flag (default false). It authors, at the template level, whether the field may hold more than one value at fill time — e.g. a photo field that accepts several photos. The Template Builder only sets the flag; honoring it (rendering repeated inputs) is the Report Renderer's fill-time responsibility. It applies to any field type and does not interact with the options list.
+
 ### Out of scope (owned by the Report Renderer spec — Aaron)
 
 - **Photo captions.** Photo fields get an optional caption at render/fill time. This is a rendered-value concern, **not** a schema change — no `caption` appears in the Template Schema.
@@ -88,7 +90,7 @@ flowchart TD
     SectionList["SectionList<br/>sortable sections"]
     SectionCard["SectionCard<br/>label, delete, droppable field area"]
     FieldList["FieldList<br/>sortable fields within a section"]
-    FieldCard["FieldCard<br/>type badge, label, required toggle"]
+    FieldCard["FieldCard<br/>type badge, label, required + allow-multiple toggles"]
     FieldEditor["FieldPropertyEditor<br/>label / required / options"]
     OptionEditor["OptionListEditor<br/>select/checklist only"]
     SaveBar["SaveBar<br/>name input + save + error"]
@@ -112,8 +114,8 @@ flowchart TD
 - **TemplateBuilderPage** — owns the dnd-kit `DndContext` and the single working `TemplateSchema` in state. All schema mutations (add/reorder/move/remove/edit) are reducer actions on this state. Owns the template name and dirty-tracking.
 - **FieldPalette** — renders exactly one draggable block per `Field_Type` (Req 2.1). Each palette item is a dnd-kit draggable carrying its `type`.
 - **SectionList / SectionCard** — sections are a dnd-kit `SortableContext` (vertical). Each `SectionCard` is both sortable (reorder, Req 3.4) and a droppable target for fields. `SectionCard` holds the section label editor and delete control (with confirm when non-empty, Req 3.8–3.9).
-- **FieldList / FieldCard** — fields within a section are a nested `SortableContext`. A `FieldCard` is sortable (in-section reorder Req 3.5, cross-section move Req 3.6) and shows the type, label, and required toggle.
-- **FieldPropertyEditor / OptionListEditor** — edit label (Req 4.1–4.2), required flag (Req 4.3), and — for `select`/`checklist` only — the options list (Req 4.4–4.7). `OptionListEditor` is not rendered for `text`, `number`, `photo`, or `signature`.
+- **FieldList / FieldCard** — fields within a section are a nested `SortableContext`. A `FieldCard` is sortable (in-section reorder Req 3.5, cross-section move Req 3.6) and shows the type, label, and the required + allow-multiple toggles.
+- **FieldPropertyEditor / OptionListEditor** — edit label (Req 4.1–4.2), required flag (Req 4.3), allow-multiple flag (Req 4.4), and — for `select`/`checklist` only — the options list (Req 4.5–4.8). `OptionListEditor` is not rendered for `text`, `number`, `photo`, or `signature`.
 - **SaveBar** — template name field and save action; surfaces save errors while retaining edits (Req 5.5–5.6).
 - **ConfirmDialog** — large-tap-target confirmation for destructive section delete.
 
@@ -133,6 +135,7 @@ type BuilderAction =
   | { kind: "removeField"; fieldId: string }
   | { kind: "renameField"; fieldId: string; label: string }
   | { kind: "setRequired"; fieldId: string; required: boolean }
+  | { kind: "setAllowMultiple"; fieldId: string; allowMultiple: boolean }
   | { kind: "addOption"; fieldId: string; value: string }
   | { kind: "editOption"; fieldId: string; index: number; value: string }
   | { kind: "removeOption"; fieldId: string; index: number };
@@ -274,7 +277,8 @@ Stored in `report_templates.schema` (jsonb). Concrete structure:
           "id": "fld_unit_photo",
           "type": "photo",
           "label": "Unit photo",
-          "required": false
+          "required": false,
+          "allowMultiple": true
         },
         {
           "id": "fld_customer_signoff",
@@ -319,6 +323,10 @@ export interface BasicField {
   type: Exclude<FieldType, OptionFieldType>;
   label: string;
   required: boolean;
+  // When true, the field may hold more than one value at fill time (e.g.
+  // multiple photos). Authored here; the Report Renderer honors it at fill
+  // time. Optional; absent is treated as false.
+  allowMultiple?: boolean;
 }
 
 // A field with an options list: select, checklist.
@@ -327,6 +335,7 @@ export interface OptionField {
   type: OptionFieldType;
   label: string;
   required: boolean;
+  allowMultiple?: boolean; // see BasicField.allowMultiple
   options: string[]; // 1..50, unique within the field
 }
 
@@ -381,10 +390,11 @@ func (t FieldType) carriesOptions() bool {
 
 type Field struct {
     ID       string    `json:"id"`
-    Type     FieldType `json:"type"`
-    Label    string    `json:"label"`
-    Required bool      `json:"required"`
-    Options  []string  `json:"options,omitempty"` // only for select/checklist
+    Type          FieldType `json:"type"`
+    Label         string    `json:"label"`
+    Required      bool      `json:"required"`
+    AllowMultiple bool      `json:"allowMultiple,omitempty"` // multi-value at fill time
+    Options       []string  `json:"options,omitempty"`       // only for select/checklist
 }
 
 type Section struct {
@@ -409,6 +419,7 @@ type TemplateSchema struct {
 | Field count | 0 ≤ len(fields) ≤ 100 per section | 1.1, 1.11 |
 | Known type | `field.Type.known()` | 1.2, 1.7, 1.8 |
 | Boolean required | always valid (Go type) — decode rejects non-bool | 1.3, 1.7 |
+| Boolean allowMultiple | always valid (Go bool) — decode rejects non-bool | 1.14, 1.15 |
 | Field id | non-empty, 1–64 chars | 1.4, 1.11 |
 | Field id uniqueness | unique across all fields in template | 1.4, 1.7 |
 | Section label | non-empty (trimmed), 1–120 chars | 1.5, 1.11, 1.12 |
@@ -544,9 +555,9 @@ These properties fall into three groups: the **backend validator** (a pure funct
 
 ### Property 15: Label and required edits change only the target element
 
-*For any* schema and any existing field or section, applying `renameField` / `renameSection` with a non-empty label (or `setRequired` with a boolean) updates only that element's label (or required flag) and leaves every other element unchanged.
+*For any* schema and any existing field or section, applying `renameField` / `renameSection` with a non-empty label (or `setRequired` / `setAllowMultiple` with a boolean) updates only that element's label (or the targeted flag) and leaves every other element unchanged.
 
-**Validates: Requirements 4.1, 4.3, 4.8**
+**Validates: Requirements 4.1, 4.3, 4.4, 4.9**
 
 ### Property 16: Option edits mutate only the target field's option list
 

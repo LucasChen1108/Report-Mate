@@ -124,6 +124,33 @@ export function FieldPropertyEditor({
           />
           Required
         </label>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 14,
+            minHeight: 44,
+          }}
+          onPointerDown={stopDnd}
+        >
+          <input
+            type="checkbox"
+            checked={field.allowMultiple ?? false}
+            data-testid={`field-allow-multiple-${field.id}`}
+            aria-label={`${field.label} allow multiple values`}
+            onKeyDown={stopDnd}
+            onChange={(e) =>
+              dispatch({
+                kind: "setAllowMultiple",
+                fieldId: field.id,
+                allowMultiple: e.target.checked,
+              })
+            }
+            style={{ width: 20, height: 20 }}
+          />
+          Allow multiple
+        </label>
       </div>
 
       {labelError && (

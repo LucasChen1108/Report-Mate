@@ -37,6 +37,7 @@ export type BuilderAction =
   | { kind: "removeField"; fieldId: string }
   | { kind: "renameField"; fieldId: string; label: string }
   | { kind: "setRequired"; fieldId: string; required: boolean }
+  | { kind: "setAllowMultiple"; fieldId: string; allowMultiple: boolean }
   | { kind: "addOption"; fieldId: string; value: string }
   | { kind: "editOption"; fieldId: string; index: number; value: string }
   | { kind: "removeOption"; fieldId: string; index: number };
@@ -336,6 +337,15 @@ export function builderReducer(
       return mapField(state, action.fieldId, (field) => ({
         ...field,
         required: action.required,
+      }));
+    }
+
+    case "setAllowMultiple": {
+      // Set the allow-multiple boolean (Req 4.4). Applies to any field type;
+      // the Report Renderer honors it at fill time.
+      return mapField(state, action.fieldId, (field) => ({
+        ...field,
+        allowMultiple: action.allowMultiple,
       }));
     }
 

@@ -247,6 +247,28 @@ The Go module exists at `backend/go.mod`. The frontend has no `package.json` yet
 - [ ] 13. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+- [ ] 14. Add the `allowMultiple` field flag (multi-value fields)
+  - Shared-contract change: a Field may hold more than one value at fill time (e.g. multiple photos). The Template Builder authors the flag; the Report Renderer (Aaron) honors it at fill time (out of scope here). Coordinate the schema change with Aaron before/at merge.
+  - [ ] 14.1 Add `allowMultiple` to the shared TypeScript type
+    - In `frontend/src/api/types.ts`, add optional `allowMultiple?: boolean` to `BasicField` and `OptionField` (absent = false)
+    - _Requirements: 1.14, 1.15, 1.10, 4.4_
+  - [ ] 14.2 Add `AllowMultiple` to the Go schema struct
+    - In `backend/internal/templates/schema.go`, add `AllowMultiple bool` with JSON tag `allowMultiple,omitempty`. No new Validate rule is needed (Go bool decode rejects non-bool, satisfying Req 1.15); confirm `Validate` still passes for schemas with and without the flag
+    - _Requirements: 1.14, 1.15_
+  - [ ] 14.3 Add the `setAllowMultiple` reducer action
+    - In `builderReducer.ts`, add `{ kind: "setAllowMultiple"; fieldId: string; allowMultiple: boolean }` and a pure case that sets only that field's flag (mirrors `setRequired`)
+    - _Requirements: 4.4_
+  - [ ] 14.4 Add the allow-multiple toggle to FieldPropertyEditor
+    - In `FieldPropertyEditor.tsx`, add an "Allow multiple" checkbox alongside the Required toggle that dispatches `setAllowMultiple`; reflect `field.allowMultiple` (default false when absent)
+    - _Requirements: 4.4_
+  - [ ]* 14.5 Extend Property 15 test to cover `setAllowMultiple`
+    - Fold `setAllowMultiple` into the label/flag-edit locality property (only the target field's flag changes)
+    - **Validates: Requirements 4.4**
+  - [ ] 14.6 Update seed(s) to exercise `allowMultiple` (optional demo polish)
+    - Set `allowMultiple: true` on a photo field in one seed (Go `seeds.go` + the `0004` migration JSON) so the flag is visible in demo data; re-run `Validate` over seeds
+    - _Requirements: 1.14, 7.2_
+
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for a faster MVP; core implementation tasks are never optional.

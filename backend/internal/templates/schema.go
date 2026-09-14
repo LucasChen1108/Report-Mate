@@ -30,11 +30,12 @@ func (t FieldType) carriesOptions() bool {
 // Field is a single typed input within a section. Options is present only for
 // select and checklist fields.
 type Field struct {
-	ID       string    `json:"id"`
-	Type     FieldType `json:"type"`
-	Label    string    `json:"label"`
-	Required bool      `json:"required"`
-	Options  []string  `json:"options,omitempty"` // only for select/checklist
+	ID            string    `json:"id"`
+	Type          FieldType `json:"type"`
+	Label         string    `json:"label"`
+	Required      bool      `json:"required"`
+	AllowMultiple bool      `json:"allowMultiple,omitempty"` // multi-value at fill time
+	Options       []string  `json:"options,omitempty"`       // only for select/checklist
 }
 
 // Section is a named, ordered grouping of fields within a template schema.

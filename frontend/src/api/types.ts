@@ -23,6 +23,10 @@ export interface BasicField {
   type: Exclude<FieldType, OptionFieldType>;
   label: string;
   required: boolean;
+  // When true, the field may hold more than one value at fill time (e.g.
+  // multiple photos). Authored in the builder; honored by the Report Renderer.
+  // Optional; absent is treated as false.
+  allowMultiple?: boolean;
 }
 
 // A field with an options list: select, checklist.
@@ -31,6 +35,7 @@ export interface OptionField {
   type: OptionFieldType;
   label: string;
   required: boolean;
+  allowMultiple?: boolean; // see BasicField.allowMultiple
   options: string[]; // 1..50, unique within the field
 }
 

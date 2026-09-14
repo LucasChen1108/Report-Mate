@@ -4,7 +4,7 @@
 
 The Template Builder is a dispatcher/admin-facing, drag-and-drop block editor for creating and customizing report templates in Report Mate (a mobile-first service-report app). A dispatcher drags typed field blocks (text, number, select, checklist, photo, signature) into ordered sections, marks each field required or optional, and saves, edits, and lists custom templates.
 
-The editor produces a **Template Schema** — an ordered list of sections, each containing typed fields with a `required` flag — stored as JSON in `report_templates.schema`. This schema is the single shared contract consumed by three parties: this Template Builder UI, the Report Renderer (manual and agent-assisted fill), and the AI agent's `get_template_schema` tool. Because the schema shape is a shared contract, its structure is the most important part of this feature; changes to its shape are expected to be rare and deliberate.
+The editor produces a **Template Schema** — an ordered list of sections, each containing typed fields with a `required` flag and an `allowMultiple` flag — stored as JSON in `report_templates.schema`. This schema is the single shared contract consumed by three parties: this Template Builder UI, the Report Renderer (manual and agent-assisted fill), and the AI agent's `get_template_schema` tool. Because the schema shape is a shared contract, its structure is the most important part of this feature; changes to its shape are expected to be rare and deliberate.
 
 The drag-and-drop mechanics are built on the team's chosen library (dnd-kit) rather than a custom canvas/undo-redo editor. The feature is dispatcher-admin only (RBAC gated), all backend access goes through the typed API client in `frontend/src/api/`, and the backend (Go) exposes `report_templates` CRUD plus schema validation. The team ships 2–3 seed templates for the demo and for teammates to test against.
 
@@ -15,7 +15,8 @@ The drag-and-drop mechanics are built on the team's chosen library (dnd-kit) rat
 - **API_Client**: The typed frontend client at `frontend/src/api/` through which all backend calls are made.
 - **Template_Schema**: The JSON structure stored in `report_templates.schema` — an ordered list of sections, each containing an ordered list of typed fields, each field carrying a `required` flag. The single contract shared by the Template Builder, Report Renderer, and agent.
 - **Section**: A named, ordered grouping of fields within a Template Schema.
-- **Field**: A single typed input within a section, having a type, a label, a stable identifier, and a `required` flag.
+- **Field**: A single typed input within a section, having a type, a label, a stable identifier, a `required` flag, and an `allowMultiple` flag.
+- **Allow_Multiple_Flag**: A boolean on each Field indicating whether, at fill time, the Field may hold more than one value (e.g. multiple photos). It governs fill-time behavior in the Report_Renderer; the Template_Builder only authors the flag.
 - **Field_Type**: One of the supported field types: `text`, `number`, `select`, `checklist`, `photo`, `signature`.
 - **Field_Palette**: The set of draggable Field_Type blocks the dispatcher drags into sections.
 - **Required_Flag**: A boolean on each Field indicating whether the field must be filled before a report is submitted.
@@ -42,10 +43,12 @@ The drag-and-drop mechanics are built on the team's chosen library (dnd-kit) rat
 7. WHEN the Template_Service receives a Template_Schema for persistence, THE Template_Service SHALL validate that every Field has a known Field_Type, a unique identifier within the template, a non-empty label, and a boolean Required_Flag before persisting.
 8. IF a submitted Template_Schema contains a Field with an unrecognized Field_Type, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending Field by its identifier.
 9. IF a submitted Template_Schema contains a `select` or `checklist` Field with an empty or missing option list, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending Field by its identifier.
-10. THE API_Client SHALL expose a shared TypeScript type mirroring the Template_Schema shape, including the Field_Type union of `text`, `number`, `select`, `checklist`, `photo`, and `signature`, so the Template_Builder and Report_Renderer reference one definition.
+10. THE API_Client SHALL expose a shared TypeScript type mirroring the Template_Schema shape, including the Field_Type union of `text`, `number`, `select`, `checklist`, `photo`, and `signature` and the Allow_Multiple_Flag, so the Template_Builder and Report_Renderer reference one definition.
 11. IF a submitted Template_Schema contains zero sections, or contains a Section whose field count or a Field, Section, option, or identifier value falls outside the bounds defined in this requirement, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending element.
 12. IF a submitted Template_Schema contains a Section or Field with a missing or empty label, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending Section or Field.
 13. IF a submitted Template_Schema contains a `select` or `checklist` Field with duplicate option values within that Field, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending Field by its identifier.
+14. THE Template_Schema SHALL assign each Field an Allow_Multiple_Flag with a boolean value, defaulting to `false` when absent.
+15. IF a submitted Template_Schema contains a Field whose Allow_Multiple_Flag is present but is not a boolean, THEN THE Template_Service SHALL reject the request without persisting any change and return a validation error identifying the offending Field by its identifier.
 
 ### Requirement 2: Drag field blocks into sections
 
@@ -79,19 +82,20 @@ The drag-and-drop mechanics are built on the team's chosen library (dnd-kit) rat
 
 ### Requirement 4: Edit field properties
 
-**User Story:** As a Dispatcher_Admin, I want to edit each field's label, required flag, and options, so that the template captures exactly the information a report needs.
+**User Story:** As a Dispatcher_Admin, I want to edit each field's label, required flag, allow-multiple flag, and options, so that the template captures exactly the information a report needs.
 
 #### Acceptance Criteria
 
 1. WHEN a Dispatcher_Admin commits a non-empty Field label, THE Template_Builder SHALL update that Field label in the Template_Schema.
 2. IF a Dispatcher_Admin commits an empty or whitespace-only Field label, THEN THE Template_Builder SHALL reject the change, retain the previous Field label in the Template_Schema, and display a message indicating that a label is required.
 3. WHEN a Dispatcher_Admin toggles a Field Required_Flag, THE Template_Builder SHALL set that Field Required_Flag to the selected boolean value.
-4. WHERE a Field has Field_Type `select` or `checklist`, WHEN a Dispatcher_Admin adds a selectable option, THE Template_Builder SHALL append the new option to that Field's option list in the Template_Schema.
-5. WHERE a Field has Field_Type `select` or `checklist`, WHEN a Dispatcher_Admin edits a selectable option, THE Template_Builder SHALL update that option in the Field's option list in the Template_Schema.
-6. WHERE a Field has Field_Type `select` or `checklist` and the Field's option list contains more than one option, WHEN a Dispatcher_Admin removes a selectable option, THE Template_Builder SHALL remove that option from the Field's option list in the Template_Schema.
-7. WHERE a Field has Field_Type `select` or `checklist` and the Field's option list contains exactly one option, IF a Dispatcher_Admin attempts to remove that option, THEN THE Template_Builder SHALL block the removal, retain the existing option in the Template_Schema, and display a message indicating that at least one option is required.
-8. WHEN a Dispatcher_Admin commits a non-empty Section label, THE Template_Builder SHALL update that Section label in the Template_Schema.
-9. IF a Dispatcher_Admin commits an empty or whitespace-only Section label, THEN THE Template_Builder SHALL reject the change, retain the previous Section label in the Template_Schema, and display a message indicating that a label is required.
+4. WHEN a Dispatcher_Admin toggles a Field Allow_Multiple_Flag, THE Template_Builder SHALL set that Field Allow_Multiple_Flag to the selected boolean value.
+5. WHERE a Field has Field_Type `select` or `checklist`, WHEN a Dispatcher_Admin adds a selectable option, THE Template_Builder SHALL append the new option to that Field's option list in the Template_Schema.
+6. WHERE a Field has Field_Type `select` or `checklist`, WHEN a Dispatcher_Admin edits a selectable option, THE Template_Builder SHALL update that option in the Field's option list in the Template_Schema.
+7. WHERE a Field has Field_Type `select` or `checklist` and the Field's option list contains more than one option, WHEN a Dispatcher_Admin removes a selectable option, THE Template_Builder SHALL remove that option from the Field's option list in the Template_Schema.
+8. WHERE a Field has Field_Type `select` or `checklist` and the Field's option list contains exactly one option, IF a Dispatcher_Admin attempts to remove that option, THEN THE Template_Builder SHALL block the removal, retain the existing option in the Template_Schema, and display a message indicating that at least one option is required.
+9. WHEN a Dispatcher_Admin commits a non-empty Section label, THE Template_Builder SHALL update that Section label in the Template_Schema.
+10. IF a Dispatcher_Admin commits an empty or whitespace-only Section label, THEN THE Template_Builder SHALL reject the change, retain the previous Section label in the Template_Schema, and display a message indicating that a label is required.
 
 ### Requirement 5: Save, edit, and list custom templates
 
