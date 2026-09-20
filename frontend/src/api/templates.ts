@@ -9,6 +9,8 @@
 // schema shape.
 
 import type { TemplateSchema } from "./types";
+import { endpointBuilders, API_ENDPOINTS } from "../config/endpoints";
+import { frontendConfig } from "../config/env";
 
 // A lightweight summary returned by the list endpoint (Req 5.4, 7.3).
 export interface TemplateSummary {
@@ -74,11 +76,9 @@ export class ApiError extends Error {
   }
 }
 
-// Configurable base URL. The paths below already include the `/api` prefix, so
-// the base defaults to an empty string. Override with VITE_API_BASE_URL (e.g.
-// a full origin) when the API lives on a different host.
-const BASE_URL: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+// Configurable base URL. Runtime configuration owns both the development
+// default and environment override; endpoint paths remain centralized below.
+const BASE_URL = frontendConfig.apiBaseUrl;
 
 // Type guard for a well-formed ValidationError body.
 function isValidationErrorBody(value: unknown): value is ValidationError {
@@ -147,15 +147,12 @@ async function request<T>(
 
 // GET /api/templates — list seed and custom templates (Req 5.4, 7.3).
 export function listTemplates(): Promise<TemplateSummary[]> {
-  return request<TemplateSummary[]>("GET", "/api/templates");
+  return request<TemplateSummary[]>("GET", API_ENDPOINTS.templates);
 }
 
 // GET /api/templates/{id} — load one template into the editor (Req 5.2).
 export function getTemplate(id: string): Promise<TemplateRecord> {
-  return request<TemplateRecord>(
-    "GET",
-    `/api/templates/${encodeURIComponent(id)}`,
-  );
+  return request<TemplateRecord>("GET", endpointBuilders.template(id));
 }
 
 // POST /api/templates — create a new template (Req 5.1).
@@ -163,7 +160,7 @@ export function createTemplate(input: {
   name: string;
   schema: TemplateSchema;
 }): Promise<TemplateRecord> {
-  return request<TemplateRecord>("POST", "/api/templates", input);
+  return request<TemplateRecord>("POST", API_ENDPOINTS.templates, input);
 }
 
 // PUT /api/templates/{id} — update an existing template (Req 5.3).
@@ -171,9 +168,5 @@ export function updateTemplate(
   id: string,
   input: { name: string; schema: TemplateSchema },
 ): Promise<TemplateRecord> {
-  return request<TemplateRecord>(
-    "PUT",
-    `/api/templates/${encodeURIComponent(id)}`,
-    input,
-  );
+  return request<TemplateRecord>("PUT", endpointBuilders.template(id), input);
 }

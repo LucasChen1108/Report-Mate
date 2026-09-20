@@ -13,27 +13,29 @@
 //
 // INTEGRATION NOTE: the app has no auth/routing system yet (owned by another
 // teammate). To stay integration-ready and self-contained, the guard takes the
-// current role via a plain `role` prop rather than reaching into a context. Once
-// the auth context lands, a thin wrapper can read the role from context and pass
-// it here (e.g. `<RequireRole role={auth.user?.role} requiredRole="dispatcher_admin">`).
+// canonical role via a typed prop rather than reaching into a context. Once the
+// auth context lands, a thin wrapper can read the role from context and pass it
+// here (e.g. `<RequireRole role={auth.user?.role} requiredRole="dispatcher_admin">`).
 //
 // Styling is minimal with large, readable tap targets (>=44px); full styling is
 // a later task.
 
 import type { CSSProperties, ReactNode } from "react";
+import { USER_ROLES } from "../auth/contracts";
+import type { UserRole } from "../auth/contracts";
 
 // The canonical dispatcher-admin role string. Kept identical to the backend
 // (`RequireRole("dispatcher_admin")`) so the UX guard and the authoritative
 // backend check agree on the role name.
-export const DISPATCHER_ADMIN_ROLE = "dispatcher_admin";
+export const DISPATCHER_ADMIN_ROLE = USER_ROLES.admin;
 
 export interface RequireRoleProps {
   // The current user's role. `null` (or undefined) means "no known role yet"
   // — e.g. before the auth context has loaded — and is treated as unauthorized.
   // The real auth context will supply this value later.
-  role: string | null;
+  role: UserRole | null | undefined;
   // The role required to view the guarded content, e.g. "dispatcher_admin".
-  requiredRole: string;
+  requiredRole: UserRole;
   // The guarded content, rendered only when `role === requiredRole`.
   children: ReactNode;
   // What to render when the user is not authorized. Defaults to a simple,
