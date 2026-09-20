@@ -42,3 +42,6 @@ pnpm-debug.log*
 *.log
 coverage/
 *.coverage
+
+# --- Login Feature Context File ---
+docs/auth-implementation-handoff.md
