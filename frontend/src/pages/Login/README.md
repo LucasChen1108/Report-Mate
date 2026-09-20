@@ -1,19 +1,19 @@
 # pages/Login/
 
-Login and role selection — the entry point everything else sits behind.
+Public login and account-creation pages for the replaceable authentication
+service boundary.
 
-## What it does
+## Behavior
 
-- Login form wired to the real API (`POST /auth/login` via `src/api/`).
-- Role selection: **technician** vs **dispatcher-admin** — at login or first use.
-- On success, stores the session/JWT (via the api client) and routes the user to
-  their landing screen (technician → report flow, dispatcher → dashboard).
-- Handles and surfaces auth errors clearly (wrong credentials, expired session).
+- Login accepts an email and password. The authenticated account returned by
+  the service determines the role; login never asks the user to select one.
+- Registration defaults to Worker and conditionally accepts either a Worker
+  join code or a company Admin code.
+- Both pages call `useAuth()` and work with either the mock or API service
+  family selected by centralized configuration.
+- Successful Admin authentication routes to Templates. Successful Worker
+  authentication routes to Generate Report.
+- Form validation, pending state, and display errors remain local to each page.
 
-## Notes
-
-- Mobile-first: large fields and buttons, high contrast, no tiny controls.
-- Role determines which routes/pages are reachable — dispatcher-only areas
-  (TemplateBuilder, Dashboard) are gated behind the dispatcher-admin role.
-
-Owner: Aarav (auth / role selection / middleware).
+Route guards, redirects away from public pages for already-authenticated users,
+and role-aware application navigation belong to Stage A Commit 6.

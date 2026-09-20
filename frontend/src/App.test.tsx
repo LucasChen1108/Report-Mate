@@ -112,8 +112,6 @@ describe("application routing", () => {
   });
 
   it.each([
-    [ROUTES.login, "Login"],
-    [ROUTES.register, "Create account"],
     [ROUTES.workers, "Workers"],
     [ROUTES.profile, "My Profile"],
   ])("renders the explicit placeholder at %s", async (path, heading) => {
@@ -121,6 +119,16 @@ describe("application routing", () => {
     expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
     expect(screen.getByText(/implemented in a later Stage A commit/i))
       .toBeInTheDocument();
+  });
+
+  it.each([
+    [ROUTES.login, "Login"],
+    [ROUTES.register, "Create account"],
+  ])("renders the public authentication page at %s", async (path, heading) => {
+    await renderApp([path]);
+    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+    expect(screen.queryByText(/implemented in a later Stage A commit/i))
+      .not.toBeInTheDocument();
   });
 
   it("mounts the ordinary Report Editor with its seed fixtures", async () => {

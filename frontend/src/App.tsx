@@ -4,6 +4,8 @@ import { AppLayout } from "./components/AppLayout";
 import { RoutePlaceholder } from "./components/RoutePlaceholder";
 import { ROUTES } from "./config/routes";
 import { TemplateDraftProvider } from "./contexts/TemplateDraftContext";
+import { LoginPage } from "./pages/Login/LoginPage";
+import { RegistrationPage } from "./pages/Login/RegistrationPage";
 import { ReportEditorRoute } from "./pages/ReportEditor/ReportEditorRoute";
 import { TemplateBuilderRoute } from "./pages/TemplateBuilder/TemplateBuilderRoute";
 import { TemplateListPage } from "./pages/TemplateList/TemplateListPage";
@@ -41,21 +43,11 @@ function App({ services = configuredServices }: AppProps) {
               />
               <Route
                 path={ROUTES.login}
-                element={
-                  <RoutePlaceholder
-                    title="Login"
-                    description="Authentication will be implemented in a later Stage A commit."
-                  />
-                }
+                element={<LoginPage />}
               />
               <Route
                 path={ROUTES.register}
-                element={
-                  <RoutePlaceholder
-                    title="Create account"
-                    description="Account creation will be implemented in a later Stage A commit."
-                  />
-                }
+                element={<RegistrationPage />}
               />
               <Route
                 path={ROUTES.workers}
