@@ -4,6 +4,7 @@ import {
   normalizeEmail,
   PASSWORD_MIN_LENGTH,
   validateLoginForm,
+  validateProfileForm,
   validateRegistrationForm,
 } from "./formValidation";
 import type { RegistrationFormValues } from "./formValidation";
@@ -112,5 +113,23 @@ describe("auth form validation", () => {
     });
     expect(adminErrors).toHaveProperty("companyAdminCode");
     expect(adminErrors).not.toHaveProperty("joinCode");
+  });
+
+  it("reuses the registration contact rules for profile edits", () => {
+    expect(validateProfileForm({
+      fullName: "Taylor Technician",
+      phone: "+65 8000 2001",
+      personalEmail: "TAYLOR@example.test",
+    })).toEqual({});
+
+    expect(validateProfileForm({
+      fullName: " ",
+      phone: "call me",
+      personalEmail: "invalid",
+    })).toEqual({
+      fullName: "Enter your full name.",
+      phone: "Enter a valid phone number with 7 to 15 digits.",
+      personalEmail: "Enter a valid personal email address.",
+    });
   });
 });

@@ -11,8 +11,10 @@ import { TemplateDraftProvider } from "./contexts/TemplateDraftContext";
 import { LoginPage } from "./pages/Login/LoginPage";
 import { RegistrationPage } from "./pages/Login/RegistrationPage";
 import { ReportEditorRoute } from "./pages/ReportEditor/ReportEditorRoute";
+import { WorkerProfilePage } from "./pages/Profile/WorkerProfilePage";
 import { TemplateBuilderRoute } from "./pages/TemplateBuilder/TemplateBuilderRoute";
 import { TemplateListPage } from "./pages/TemplateList/TemplateListPage";
+import { WorkerManagementPage } from "./pages/Workers/WorkerManagementPage";
 import type { ServiceBundle } from "./services/contracts";
 import { configuredServices } from "./services/createServices";
 import { ServiceProvider } from "./services/ServiceProvider";
@@ -64,24 +66,14 @@ function App({ services = configuredServices }: AppProps) {
                   />
                   <Route
                     path={ROUTES.workers}
-                    element={
-                      <RoutePlaceholder
-                        title="Workers"
-                        description="Worker management will be implemented in a later Stage A commit."
-                      />
-                    }
+                    element={<WorkerManagementPage />}
                   />
                 </Route>
 
                 <Route element={<RequireRole requiredRole={USER_ROLES.worker} />}>
                   <Route
                     path={ROUTES.profile}
-                    element={
-                      <RoutePlaceholder
-                        title="My Profile"
-                        description="The Worker profile will be implemented in a later Stage A commit."
-                      />
-                    }
+                    element={<WorkerProfilePage />}
                   />
                 </Route>
               </Route>

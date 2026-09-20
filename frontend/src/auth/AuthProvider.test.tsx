@@ -253,6 +253,42 @@ describe("AuthProvider", () => {
     expect(auth.logout).toHaveBeenCalledOnce();
   });
 
+  it("merges profile identity fields only for the current authenticated user", async () => {
+    const auth = createAuthService({
+      getCurrentUser: vi.fn(async () => workerUser),
+    });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(auth),
+    });
+    await waitForRestoration(result);
+
+    act(() => {
+      result.current.updateUserIdentity({
+        id: workerUser.id,
+        fullName: "Updated Worker",
+        phone: "+65 8999 0000",
+        personalEmail: "updated.worker@example.test",
+      });
+    });
+
+    expect(result.current.user).toEqual({
+      ...workerUser,
+      fullName: "Updated Worker",
+      phone: "+65 8999 0000",
+      personalEmail: "updated.worker@example.test",
+    });
+
+    act(() => {
+      result.current.updateUserIdentity({
+        id: "another-user",
+        fullName: "Wrong User",
+        phone: "+65 8111 1111",
+        personalEmail: "wrong@example.test",
+      });
+    });
+    expect(result.current.user?.fullName).toBe("Updated Worker");
+  });
+
   it("does not let a stale restoration overwrite a newer login", async () => {
     const restoration = deferred<AuthUser | null>();
     const auth = createAuthService({

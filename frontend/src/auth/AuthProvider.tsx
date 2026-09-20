@@ -20,6 +20,9 @@ interface AuthContextValue {
   register: (input: RegistrationInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
   handleSessionError: (error: unknown) => Promise<boolean>;
+  updateUserIdentity: (
+    identity: Pick<AuthUser, "id" | "fullName" | "phone" | "personalEmail">,
+  ) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -163,6 +166,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [auth],
   );
 
+  const updateUserIdentity = useCallback(
+    (
+      identity: Pick<
+        AuthUser,
+        "id" | "fullName" | "phone" | "personalEmail"
+      >,
+    ): void => {
+      setUser((current) => {
+        if (!current || current.id !== identity.id) return current;
+        return {
+          ...current,
+          fullName: identity.fullName,
+          phone: identity.phone,
+          personalEmail: identity.personalEmail,
+        };
+      });
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -171,8 +194,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       handleSessionError,
+      updateUserIdentity,
     }),
-    [handleSessionError, isRestoring, login, logout, register, user],
+    [
+      handleSessionError,
+      isRestoring,
+      login,
+      logout,
+      register,
+      updateUserIdentity,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

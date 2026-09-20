@@ -32,6 +32,15 @@ export type RegistrationFieldErrors = Partial<
   Record<RegistrationField, string>
 >;
 
+export interface ProfileFormValues {
+  fullName: string;
+  phone: string;
+  personalEmail: string;
+}
+
+export type ProfileField = keyof ProfileFormValues;
+export type ProfileFieldErrors = Partial<Record<ProfileField, string>>;
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_CHARACTERS_PATTERN = /^\+?[0-9 ()-]+$/;
 
@@ -70,29 +79,14 @@ export function validateRegistrationForm(
     errors.company = "Enter your company name.";
   }
 
-  const phone = values.phone.trim();
-  const digitCount = phone.replace(/\D/g, "").length;
-  if (!phone) {
-    errors.phone = "Enter your phone number.";
-  } else if (
-    !PHONE_CHARACTERS_PATTERN.test(phone) ||
-    digitCount < 7 ||
-    digitCount > 15
-  ) {
-    errors.phone = "Enter a valid phone number with 7 to 15 digits.";
-  }
-
-  validateEmailField(
+  errors.phone = getPhoneError(values.phone);
+  errors.personalEmail = getEmailError(
     values.personalEmail,
-    "personalEmail",
     "personal email address",
-    errors,
   );
-  validateEmailField(
+  errors.companyEmail = getEmailError(
     values.companyEmail,
-    "companyEmail",
     "company email address",
-    errors,
   );
 
   if (!values.password) {
@@ -129,16 +123,41 @@ export function validateRegistrationForm(
   return errors;
 }
 
-function validateEmailField(
-  value: string,
-  field: "personalEmail" | "companyEmail",
-  label: string,
-  errors: RegistrationFieldErrors,
-): void {
-  const email = normalizeEmail(value);
-  if (!email) {
-    errors[field] = `Enter your ${label}.`;
-  } else if (!EMAIL_PATTERN.test(email)) {
-    errors[field] = `Enter a valid ${label}.`;
+export function validateProfileForm(
+  values: ProfileFormValues,
+): ProfileFieldErrors {
+  const errors: ProfileFieldErrors = {};
+  if (!values.fullName.trim()) {
+    errors.fullName = "Enter your full name.";
   }
+  errors.phone = getPhoneError(values.phone);
+  errors.personalEmail = getEmailError(
+    values.personalEmail,
+    "personal email address",
+  );
+  return errors;
+}
+
+function getPhoneError(value: string): string | undefined {
+  const phone = value.trim();
+  const digitCount = phone.replace(/\D/g, "").length;
+  if (!phone) return "Enter your phone number.";
+  if (
+    !PHONE_CHARACTERS_PATTERN.test(phone) ||
+    digitCount < 7 ||
+    digitCount > 15
+  ) {
+    return "Enter a valid phone number with 7 to 15 digits.";
+  }
+  return undefined;
+}
+
+function getEmailError(
+  value: string,
+  label: string,
+): string | undefined {
+  const email = normalizeEmail(value);
+  if (!email) return `Enter your ${label}.`;
+  if (!EMAIL_PATTERN.test(email)) return `Enter a valid ${label}.`;
+  return undefined;
 }
