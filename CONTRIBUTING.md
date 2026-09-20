@@ -1,8 +1,11 @@
 # Contributing to Report Mate
 
-This repo is currently **scaffolding** — folders and descriptive placeholders,
-no implementation code yet. This guide is how the four of us build on top of it
-without stepping on each other.
+**To get it running on your machine, see [DEVELOPMENT.md](DEVELOPMENT.md).**
+This file is about how we work together; that one is about how to boot the
+thing.
+
+This guide is how the four of us build on the repo without stepping on each
+other.
 
 ## Ground rules (from the steering docs)
 

@@ -25,6 +25,7 @@ type TemplateSummary struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	IsSeed    bool      `json:"isSeed"`
+	Revision  int       `json:"revision"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -32,12 +33,18 @@ type TemplateSummary struct {
 // schema. Its JSON shape mirrors the frontend api/templates.ts TemplateRecord
 // type.
 type TemplateRecord struct {
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Schema    TemplateSchema `json:"schema"`
-	IsSeed    bool           `json:"isSeed"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Schema TemplateSchema `json:"schema"`
+	IsSeed bool           `json:"isSeed"`
+	// Revision counts edits to THIS template and is bumped by Update on every
+	// save. It is not report_templates.schema's "version" key, which is the
+	// format version of the shared Template Schema contract. A service report
+	// pins the revision it was filled against (service_reports.template_revision)
+	// so a later edit can never be mistaken for the schema it was signed off on.
+	Revision  int       `json:"revision"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // Store owns report_templates persistence. Implementations map the schema to
@@ -51,9 +58,9 @@ type Store interface {
 	// Create inserts a new custom template (is_seed = false) and returns the
 	// persisted record.
 	Create(ctx context.Context, name string, schema TemplateSchema) (TemplateRecord, error)
-	// Update replaces the name and schema of an existing template, refreshes
-	// updated_at, and returns the persisted record; it returns ErrNotFound if
-	// no template has the given id.
+	// Update replaces the name and schema of an existing template, bumps its
+	// revision, refreshes updated_at, and returns the persisted record; it
+	// returns ErrNotFound if no template has the given id.
 	Update(ctx context.Context, id, name string, schema TemplateSchema) (TemplateRecord, error)
 }
 
@@ -76,7 +83,7 @@ var _ Store = (*PostgresStore)(nil)
 // List implements Store.
 func (s *PostgresStore) List(ctx context.Context) ([]TemplateSummary, error) {
 	const query = `
-		SELECT id, name, is_seed, updated_at
+		SELECT id, name, is_seed, revision, updated_at
 		FROM report_templates
 		ORDER BY updated_at DESC`
 
@@ -89,7 +96,7 @@ func (s *PostgresStore) List(ctx context.Context) ([]TemplateSummary, error) {
 	summaries := make([]TemplateSummary, 0)
 	for rows.Next() {
 		var summary TemplateSummary
-		if err := rows.Scan(&summary.ID, &summary.Name, &summary.IsSeed, &summary.UpdatedAt); err != nil {
+		if err := rows.Scan(&summary.ID, &summary.Name, &summary.IsSeed, &summary.Revision, &summary.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("templates: list scan: %w", err)
 		}
 		summaries = append(summaries, summary)
@@ -103,7 +110,7 @@ func (s *PostgresStore) List(ctx context.Context) ([]TemplateSummary, error) {
 // Get implements Store. It returns ErrNotFound when no row matches id.
 func (s *PostgresStore) Get(ctx context.Context, id string) (TemplateRecord, error) {
 	const query = `
-		SELECT id, name, schema, is_seed, created_at, updated_at
+		SELECT id, name, schema, is_seed, revision, created_at, updated_at
 		FROM report_templates
 		WHERE id = $1`
 
@@ -122,7 +129,7 @@ func (s *PostgresStore) Create(ctx context.Context, name string, schema Template
 	const query = `
 		INSERT INTO report_templates (name, schema)
 		VALUES ($1, $2)
-		RETURNING id, name, schema, is_seed, created_at, updated_at`
+		RETURNING id, name, schema, is_seed, revision, created_at, updated_at`
 
 	row := s.db.QueryRowContext(ctx, query, name, raw)
 	rec, err := scanRecord(row)
@@ -137,8 +144,10 @@ func (s *PostgresStore) Create(ctx context.Context, name string, schema Template
 	return rec, nil
 }
 
-// Update implements Store. It refreshes updated_at to now() and returns
-// ErrNotFound when no row matches id.
+// Update implements Store. It bumps revision by one so consumers can tell a
+// template apart from the version a historical report was filled against,
+// refreshes updated_at to now(), and returns ErrNotFound when no row matches
+// id.
 func (s *PostgresStore) Update(ctx context.Context, id, name string, schema TemplateSchema) (TemplateRecord, error) {
 	raw, err := json.Marshal(schema)
 	if err != nil {
@@ -147,9 +156,9 @@ func (s *PostgresStore) Update(ctx context.Context, id, name string, schema Temp
 
 	const query = `
 		UPDATE report_templates
-		SET name = $2, schema = $3, updated_at = now()
+		SET name = $2, schema = $3, revision = revision + 1, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, schema, is_seed, created_at, updated_at`
+		RETURNING id, name, schema, is_seed, revision, created_at, updated_at`
 
 	row := s.db.QueryRowContext(ctx, query, id, name, raw)
 	return scanRecord(row)
@@ -163,7 +172,7 @@ func scanRecord(row *sql.Row) (TemplateRecord, error) {
 		rec       TemplateRecord
 		rawSchema []byte
 	)
-	err := row.Scan(&rec.ID, &rec.Name, &rawSchema, &rec.IsSeed, &rec.CreatedAt, &rec.UpdatedAt)
+	err := row.Scan(&rec.ID, &rec.Name, &rawSchema, &rec.IsSeed, &rec.Revision, &rec.CreatedAt, &rec.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return TemplateRecord{}, ErrNotFound

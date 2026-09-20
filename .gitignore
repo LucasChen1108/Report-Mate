@@ -38,6 +38,12 @@ pnpm-debug.log*
 !.env.example
 *.local
 
+# ---- Runtime artifacts ----
+# EXPORT_DIR defaults to ./var/exports (backend/internal/config/config.go), so
+# every save-and-export writes a rendered HTML snapshot under var/. Those are
+# generated output, not source.
+var/
+
 # ---- Logs / coverage ----
 *.log
 coverage/

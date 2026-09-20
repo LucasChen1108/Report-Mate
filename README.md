@@ -2,6 +2,10 @@
 
 Mobile-first web app that helps field technicians write service reports after customer visits — built around customizable report templates and an AI agent that fills them in.
 
+> **Want to run it?** → **[DEVELOPMENT.md](DEVELOPMENT.md)** — Postgres, env
+> vars, migrations, the two dev logins, both test suites. Start there; this
+> file is the product, not the setup.
+
 Built for the **"Show Me Your Agents"** hackathon (NUS-ISS, Public Category), which is judged partly on agentic AI use (including a "Best Agents Use" special award). The AI agent is a first-class feature, not an add-on.
 
 ## The problem

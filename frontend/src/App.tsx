@@ -1,142 +1,107 @@
-// App — the top-level shell.
+// App — the top-level shell: auth provider + router.
 //
-// The app has no router yet (task 11.3), so this shell is a lightweight nav that
-// switches between the two built pages: the Template Builder (drag-and-drop
-// editor) and the Report Renderer (interactive A4 fill surface).
+// SCOPE (task 11.3): this file owns the route table and the persistent nav, and
+// nothing else. It replaces the earlier two-tab shell that manually switched
+// between the Builder and the Renderer.
 //
-// It also demonstrates that the renderer is schema-driven, not hardcoded: the
-// Builder's live working schema is captured here via its optional
-// onSchemaChange/onNameChange observers, and "Preview in renderer" feeds that
-// exact schema into the Report Editor (in-memory, no backend). Sections/fields
-// you add or rename in the Builder show up in the rendered document.
+// The structure is fixed so four agents can extend it in parallel without
+// colliding:
 //
-// When the backend + real router land, this shell is replaced by proper routes;
-// the two pages themselves are unchanged.
+//   <AuthProvider>            — session state, read by the nav and the guards
+//     <RouterProvider>        — the route table below
+//       <AppLayout>           — persistent nav + <Outlet />
+//         /login              — the only route outside the gate
+//         <RequireAuth>       — everything else: signed in, or sent to /login
+//           <RequireRoleRoute>  — /templates*: dispatcher-admin only
+//
+// ROUTE OWNERSHIP (each route's page belongs to one agent; this table does not):
+//   /login                              auth agent
+//   /dashboard, /dashboard/templates/:id  dashboard agent
+//   /templates*                         template builder (already built)
+//   /reports*                           renderer agent
+//
+// WHY WRAPPERS: the three built pages (TemplateList, TemplateBuilder,
+// ReportEditor) predate the router and take callbacks/initial props rather than
+// reading route params. src/routes/* bridges that, so those pages stay
+// untouched — see each wrapper's header for the specifics.
+//
+// DROPPED ON PURPOSE: the old shell's "Preview builder template in renderer"
+// action, which piped the Builder's live schema into the Renderer in memory.
+// That was a no-backend scaffold; the Builder now persists templates and the
+// Renderer loads them by id.
 
-import { useCallback, useState } from "react";
-import type { TemplateSchema } from "./api/types";
-import { TemplateBuilderPage } from "./pages/TemplateBuilder/TemplateBuilderPage";
-import { ReportEditorPage } from "./pages/ReportEditor/ReportEditorPage";
-import { colors, fontSize, radius, spacing } from "./styles/tokens";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import { AuthProvider } from "./auth/AuthContext";
+import { RequireAuth } from "./components/RequireAuth";
+import { RequireRoleRoute } from "./components/RequireRoleRoute";
+import { AppLayout } from "./routes/AppLayout";
+import { TemplateListRoute } from "./routes/TemplateListRoute";
+import { TemplateBuilderRoute } from "./routes/TemplateBuilderRoute";
+import { ReportEditorRoute } from "./routes/ReportEditorRoute";
+import { DashboardPage } from "./pages/Dashboard/DashboardPage";
+import { TemplateReportsPage } from "./pages/Dashboard/TemplateReportsPage";
+import { LoginPage } from "./pages/Login/LoginPage";
 
-type View = "builder" | "renderer";
-// Renderer source: the seed-fixture harness, or the schema captured live from
-// the Builder.
-type RendererSource = "seeds" | "builder";
+const router = createBrowserRouter([
+  {
+    // The layout route: persistent nav + <Outlet />. Every route sits under it,
+    // including /login, so the app is never a dead end.
+    element: <AppLayout />,
+    children: [
+      // /login is the ONE route outside the auth gate. It sits as a sibling of
+      // <RequireAuth /> rather than inside it, because a route that redirects
+      // the signed-out to /login cannot also contain /login.
+      { path: "login", element: <LoginPage /> },
+
+      {
+        // The AUTHENTICATION gate. Everything below it requires a session;
+        // a signed-out visitor is sent to /login carrying where they were
+        // headed, and gets there after signing in. Declared ONCE, as a
+        // pathless layout route, so a route added later is gated by
+        // construction rather than by the author remembering to gate it.
+        //
+        // This is a DIFFERENT question from the role gate nested inside it —
+        // see components/RequireAuth.tsx for why the two do not merge.
+        element: <RequireAuth />,
+        children: [
+          { index: true, element: <Navigate to="/dashboard" replace /> },
+
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "dashboard/templates/:templateId", element: <TemplateReportsPage /> },
+
+          {
+            // Dispatcher-admin only (Req 6.1, 6.2). A pathless layout route so
+            // the guard is declared ONCE for the whole template-management
+            // branch rather than repeated per route — a new /templates/* route
+            // added later is guarded by construction.
+            element: <RequireRoleRoute />,
+            children: [
+              { path: "templates", element: <TemplateListRoute /> },
+              { path: "templates/new", element: <TemplateBuilderRoute /> },
+              { path: "templates/:templateId/edit", element: <TemplateBuilderRoute /> },
+            ],
+          },
+
+          // Report fill surface — open to technicians and dispatchers alike.
+          // /reports/new reads ?templateId=; /reports/:reportId loads a saved one.
+          { path: "reports/new", element: <ReportEditorRoute /> },
+          { path: "reports/:reportId", element: <ReportEditorRoute /> },
+
+          // Unknown path -> the landing screen, rather than a blank router
+          // error. Inside the gate, so an unknown path while signed out lands
+          // on /login rather than briefly rendering the dashboard.
+          { path: "*", element: <Navigate to="/dashboard" replace /> },
+        ],
+      },
+    ],
+  },
+]);
 
 function App() {
-  const [view, setView] = useState<View>("builder");
-  const [rendererSource, setRendererSource] = useState<RendererSource>("seeds");
-
-  // The Builder's live working schema/name, mirrored here via its observers.
-  const [builderSchema, setBuilderSchema] = useState<TemplateSchema | undefined>();
-  const [builderName, setBuilderName] = useState<string>("");
-
-  // Stable callbacks so the Builder's effect deps don't churn each render.
-  const handleSchemaChange = useCallback((s: TemplateSchema) => setBuilderSchema(s), []);
-  const handleNameChange = useCallback((n: string) => setBuilderName(n), []);
-
-  // Jump to the renderer showing the current Builder template.
-  const previewInRenderer = () => {
-    setRendererSource("builder");
-    setView("renderer");
-  };
-
-  const external = rendererSource === "builder" ? builderSchema : undefined;
-
   return (
-    <div>
-      <nav
-        className="rm-no-print"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: spacing.sm,
-          padding: `${spacing.sm}px ${spacing.lg}px`,
-          background: colors.primary,
-          color: colors.onPrimary,
-        }}
-      >
-        <strong style={{ fontSize: fontSize.lg, marginRight: spacing.md }}>Report Mate</strong>
-
-        <TabButton active={view === "builder"} onClick={() => setView("builder")}>
-          Template Builder
-        </TabButton>
-        <TabButton
-          active={view === "renderer"}
-          onClick={() => {
-            setRendererSource("seeds");
-            setView("renderer");
-          }}
-        >
-          Report Renderer
-        </TabButton>
-
-        {/* Cross-page action: render the template being built right now. */}
-        <button
-          type="button"
-          onClick={previewInRenderer}
-          disabled={!builderSchema}
-          title={builderSchema ? "Render the template you're building" : "Edit a template first"}
-          style={{
-            marginLeft: "auto",
-            minHeight: 40,
-            padding: `${spacing.xs}px ${spacing.md}px`,
-            fontSize: fontSize.sm,
-            borderRadius: radius.md,
-            border: `1px solid ${colors.onPrimary}`,
-            background: "transparent",
-            color: colors.onPrimary,
-            cursor: builderSchema ? "pointer" : "not-allowed",
-            opacity: builderSchema ? 1 : 0.6,
-          }}
-        >
-          Preview builder template in renderer →
-        </button>
-      </nav>
-
-      {view === "builder" ? (
-        <TemplateBuilderPage
-          onSchemaChange={handleSchemaChange}
-          onNameChange={handleNameChange}
-        />
-      ) : (
-        <ReportEditorPage externalSchema={external} externalName={builderName} />
-      )}
-    </div>
-  );
-}
-
-// A single high-contrast nav tab.
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      style={{
-        minHeight: 40,
-        padding: `${spacing.xs}px ${spacing.md}px`,
-        fontSize: fontSize.base,
-        borderRadius: radius.md,
-        border: `1px solid ${colors.onPrimary}`,
-        background: active ? colors.onPrimary : "transparent",
-        color: active ? colors.primary : colors.onPrimary,
-        fontWeight: active ? 700 : 400,
-        cursor: "pointer",
-      }}
-    >
-      {children}
-    </button>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   );
 }
 
