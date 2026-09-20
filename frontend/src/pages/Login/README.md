@@ -12,8 +12,11 @@ service boundary.
 - Both pages call `useAuth()` and work with either the mock or API service
   family selected by centralized configuration.
 - Successful Admin authentication routes to Templates. Successful Worker
-  authentication routes to Generate Report.
+  authentication routes to Generate Report. Login first restores a protected
+  destination when it is a known internal route allowed for the returned role.
 - Form validation, pending state, and display errors remain local to each page.
 
-Route guards, redirects away from public pages for already-authenticated users,
-and role-aware application navigation belong to Stage A Commit 6.
+Stage A Commit 6 adds restoration-aware route guards, redirects authenticated
+users away from these public pages, and renders role-aware application
+navigation. Those frontend guards are not a security boundary; the backend must
+authorize protected requests independently.

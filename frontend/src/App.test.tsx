@@ -1,17 +1,20 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import type { MemoryRouterProps } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { routeBuilders, ROUTES } from "./config/routes";
+import type { AuthUser } from "./auth/contracts";
+import { ROUTES, routeBuilders } from "./config/routes";
 import type { TemplateEditNavigationState } from "./routing/navigationState";
 import type {
+  AuthService,
   ServiceBundle,
   TemplateRecord,
   TemplateService,
 } from "./services/contracts";
 import { createMockServiceBundle } from "./services/createServices";
+import { MOCK_FIXTURES } from "./services/mock/fixtures";
 import { MemoryStorage } from "./services/mock/MockSessionManager";
 
 const templateRecord: TemplateRecord = {
@@ -33,11 +36,17 @@ const templateRecord: TemplateRecord = {
 };
 
 type InitialEntries = NonNullable<MemoryRouterProps["initialEntries"]>;
+type AccountRole = "admin" | "worker" | null;
 
 let services: ServiceBundle;
 let templateService: TemplateService;
 
-async function renderApp(initialEntries: InitialEntries) {
+async function renderApp(
+  initialEntries: InitialEntries,
+  accountRole: AccountRole = "admin",
+) {
+  if (accountRole) await loginAs(accountRole);
+
   const rendered = render(
     <MemoryRouter initialEntries={initialEntries}>
       <App services={services} />
@@ -47,6 +56,16 @@ async function renderApp(initialEntries: InitialEntries) {
     await Promise.resolve();
   });
   return rendered;
+}
+
+async function loginAs(role: Exclude<AccountRole, null>) {
+  const fixture = role === "admin"
+    ? MOCK_FIXTURES.users.acmeAdmin
+    : MOCK_FIXTURES.users.acmeActiveWorker;
+  await services.auth.login({
+    email: fixture.email,
+    password: fixture.password,
+  });
 }
 
 function HistoryControls() {
@@ -92,49 +111,56 @@ beforeEach(() => {
 });
 
 describe("application routing", () => {
-  it("redirects the root route to the template list", async () => {
-    await renderApp([ROUTES.root]);
+  it("routes the root to login when signed out", async () => {
+    await renderApp([ROUTES.root], null);
 
     expect(
-      await screen.findByRole("heading", { name: "Templates" }),
+      await screen.findByRole("heading", { name: "Login" }),
     ).toBeInTheDocument();
   });
 
+  it.each([
+    ["admin", "Templates"],
+    ["worker", "Report fixture"],
+  ] as const)("routes an authenticated %s home", async (role, landmark) => {
+    await renderApp([ROUTES.root], role);
+
+    if (role === "admin") {
+      expect(
+        await screen.findByRole("heading", { name: landmark }),
+      ).toBeInTheDocument();
+    } else {
+      expect(await screen.findByTestId("fixture-switcher"))
+        .toBeInTheDocument();
+    }
+  });
+
   it("renders a useful page for an unknown route", async () => {
-    await renderApp(["/not-a-real-page"]);
+    await renderApp(["/not-a-real-page"], null);
 
     expect(
       screen.getByRole("heading", { name: "Page not found" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Go to templates" }),
-    ).toHaveAttribute("href", ROUTES.templates);
-  });
-
-  it.each([
-    [ROUTES.workers, "Workers"],
-    [ROUTES.profile, "My Profile"],
-  ])("renders the explicit placeholder at %s", async (path, heading) => {
-    await renderApp([path]);
-    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
-    expect(screen.getByText(/implemented in a later Stage A commit/i))
-      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go home" }))
+      .toHaveAttribute("href", ROUTES.root);
   });
 
   it.each([
     [ROUTES.login, "Login"],
     [ROUTES.register, "Create account"],
   ])("renders the public authentication page at %s", async (path, heading) => {
-    await renderApp([path]);
-    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
-    expect(screen.queryByText(/implemented in a later Stage A commit/i))
+    await renderApp([path], null);
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Application" }))
       .not.toBeInTheDocument();
   });
 
   it("mounts the ordinary Report Editor with its seed fixtures", async () => {
     await renderApp([ROUTES.generateReport]);
 
-    expect(screen.getByTestId("fixture-switcher")).toBeInTheDocument();
+    expect(await screen.findByTestId("fixture-switcher")).toBeInTheDocument();
     expect(screen.queryByText(/Previewing:/)).not.toBeInTheDocument();
   });
 
@@ -213,6 +239,7 @@ describe("application routing", () => {
 
   it("supports browser-style back and forward navigation", async () => {
     const user = userEvent.setup();
+    await loginAs("admin");
     render(
       <MemoryRouter initialEntries={[ROUTES.templates]}>
         <HistoryControls />
@@ -231,5 +258,211 @@ describe("application routing", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Test forward" }));
     expect(screen.getByTestId("fixture-switcher")).toBeInTheDocument();
+  });
+});
+
+describe("authentication and role guards", () => {
+  const protectedRoutes = [
+    ROUTES.generateReport,
+    ROUTES.templates,
+    ROUTES.newTemplate,
+    routeBuilders.template(templateRecord.id),
+    ROUTES.workers,
+    ROUTES.profile,
+  ];
+
+  it.each(protectedRoutes)("redirects signed-out access to %s to login", async (path) => {
+    await renderApp([path], null);
+
+    expect(
+      await screen.findByRole("heading", { name: "Login" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Application" }))
+      .not.toBeInTheDocument();
+  });
+
+  it.each([
+    ROUTES.templates,
+    ROUTES.newTemplate,
+    routeBuilders.template(templateRecord.id),
+    ROUTES.workers,
+  ])("redirects Worker access to %s to Generate Report", async (path) => {
+    await renderApp([path], "worker");
+
+    expect(await screen.findByTestId("fixture-switcher")).toBeInTheDocument();
+    expect(templateService.get).not.toHaveBeenCalled();
+    expect(templateService.list).not.toHaveBeenCalled();
+  });
+
+  it("allows a Worker to access the profile route", async () => {
+    await renderApp([ROUTES.profile], "worker");
+
+    expect(
+      await screen.findByRole("heading", { name: "My Profile" }),
+    ).toBeInTheDocument();
+  });
+
+  it("redirects an Admin away from the Worker profile", async () => {
+    await renderApp([ROUTES.profile], "admin");
+
+    expect(
+      await screen.findByRole("heading", { name: "Templates" }),
+    ).toBeInTheDocument();
+  });
+
+  it("allows an Admin to access Worker management", async () => {
+    await renderApp([ROUTES.workers], "admin");
+
+    expect(
+      await screen.findByRole("heading", { name: "Workers" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([ROUTES.login, ROUTES.register])(
+    "redirects an authenticated Admin away from %s",
+    async (path) => {
+      await renderApp([path], "admin");
+
+      expect(
+        await screen.findByRole("heading", { name: "Templates" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("does not render or load protected content while restoration is pending", async () => {
+    const adminUser = await services.auth.login({
+      email: MOCK_FIXTURES.users.acmeAdmin.email,
+      password: MOCK_FIXTURES.users.acmeAdmin.password,
+    });
+    await services.auth.logout();
+
+    let resolveRestoration!: (user: AuthUser | null) => void;
+    const restoration = new Promise<AuthUser | null>((resolve) => {
+      resolveRestoration = resolve;
+    });
+    const pendingAuth: AuthService = {
+      login: vi.fn(),
+      register: vi.fn(),
+      getCurrentUser: vi.fn(() => restoration),
+      logout: vi.fn().mockResolvedValue(undefined),
+    };
+    services = { ...services, auth: pendingAuth };
+
+    render(
+      <MemoryRouter initialEntries={[ROUTES.templates]}>
+        <App services={services} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("status"),
+    ).toHaveTextContent("Checking your session…");
+    expect(screen.queryByRole("heading", { name: "Templates" }))
+      .not.toBeInTheDocument();
+    expect(templateService.list).not.toHaveBeenCalled();
+
+    await act(async () => resolveRestoration(adminUser));
+
+    expect(
+      await screen.findByRole("heading", { name: "Templates" }),
+    ).toBeInTheDocument();
+  });
+
+  it("restores an authorized intended destination after login", async () => {
+    const user = userEvent.setup();
+    await renderApp([ROUTES.workers], null);
+
+    await user.type(
+      await screen.findByLabelText("Email"),
+      MOCK_FIXTURES.users.acmeAdmin.email,
+    );
+    await user.type(
+      screen.getByLabelText("Password"),
+      MOCK_FIXTURES.users.acmeAdmin.password,
+    );
+    await user.click(screen.getByRole("button", { name: "Login" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Workers" }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the role landing page for a forbidden intended destination", async () => {
+    const user = userEvent.setup();
+    await renderApp([ROUTES.templates], null);
+
+    await user.type(
+      await screen.findByLabelText("Email"),
+      MOCK_FIXTURES.users.acmeActiveWorker.email,
+    );
+    await user.type(
+      screen.getByLabelText("Password"),
+      MOCK_FIXTURES.users.acmeActiveWorker.password,
+    );
+    await user.click(screen.getByRole("button", { name: "Login" }));
+
+    expect(await screen.findByTestId("fixture-switcher")).toBeInTheDocument();
+    expect(templateService.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("role-aware navigation", () => {
+  it("shows exactly the Admin navigation actions", async () => {
+    await renderApp([ROUTES.templates], "admin");
+
+    const navigation = await screen.findByRole("navigation", {
+      name: "Application",
+    });
+    expect(within(navigation).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["Generate Report", "Templates", "Workers"]);
+    expect(within(navigation).getByRole("button", { name: "Logout" }))
+      .toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "My Profile" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("shows exactly the Worker navigation actions", async () => {
+    await renderApp([ROUTES.generateReport], "worker");
+
+    const navigation = await screen.findByRole("navigation", {
+      name: "Application",
+    });
+    expect(within(navigation).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["Generate Report", "My Profile"]);
+    expect(within(navigation).getByRole("button", { name: "Logout" }))
+      .toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "Templates" }))
+      .not.toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "Workers" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("logs out and browser back cannot reveal protected content", async () => {
+    const user = userEvent.setup();
+    await loginAs("admin");
+    render(
+      <MemoryRouter
+        initialEntries={[ROUTES.login, ROUTES.templates]}
+        initialIndex={1}
+      >
+        <HistoryControls />
+        <App services={services} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Templates" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Logout" }));
+    expect(
+      await screen.findByRole("heading", { name: "Login" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Test back" }));
+    expect(
+      await screen.findByRole("heading", { name: "Login" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Templates" }))
+      .not.toBeInTheDocument();
   });
 });

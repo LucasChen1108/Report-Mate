@@ -15,6 +15,7 @@ import type {
   RegistrationFormValues,
 } from "../../auth/formValidation";
 import { ROUTES } from "../../config/routes";
+import { getRoleLandingRoute } from "../../routing/authNavigation";
 import { isServiceError } from "../../services/errors";
 import "./authForms.css";
 
@@ -119,12 +120,7 @@ export function RegistrationPage() {
     setIsSubmitting(true);
     try {
       const user = await register(input);
-      navigate(
-        user.role === USER_ROLES.admin
-          ? ROUTES.templates
-          : ROUTES.generateReport,
-        { replace: true },
-      );
+      navigate(getRoleLandingRoute(user.role), { replace: true });
     } catch (error) {
       const displayError = getRegistrationError(error);
       setServiceError(displayError.message);

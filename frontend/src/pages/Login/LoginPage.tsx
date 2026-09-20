@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
-import { USER_ROLES } from "../../auth/contracts";
 import {
   normalizeEmail,
   validateLoginForm,
@@ -12,6 +11,7 @@ import type {
   LoginFieldErrors,
 } from "../../auth/formValidation";
 import { ROUTES } from "../../config/routes";
+import { getPostLoginRoute } from "../../routing/authNavigation";
 import { isServiceError } from "../../services/errors";
 import "./authForms.css";
 
@@ -20,6 +20,7 @@ const LOGIN_FIELD_ORDER: LoginField[] = ["email", "password"];
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
@@ -58,12 +59,7 @@ export function LoginPage() {
         email: normalizeEmail(email),
         password,
       });
-      navigate(
-        user.role === USER_ROLES.admin
-          ? ROUTES.templates
-          : ROUTES.generateReport,
-        { replace: true },
-      );
+      navigate(getPostLoginRoute(location.state, user.role), { replace: true });
     } catch (error) {
       setServiceError(getLoginErrorMessage(error));
     } finally {

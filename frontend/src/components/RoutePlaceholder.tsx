@@ -16,7 +16,7 @@ export function RoutePlaceholder({
     <main className="rm-page">
       <h1>{title}</h1>
       <p>{description}</p>
-      {showHomeLink && <Link to={ROUTES.templates}>Go to templates</Link>}
+      {showHomeLink && <Link to={ROUTES.root}>Go home</Link>}
     </main>
   );
 }
