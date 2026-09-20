@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import type { MemoryRouterProps } from "react-router-dom";
@@ -37,12 +37,16 @@ type InitialEntries = NonNullable<MemoryRouterProps["initialEntries"]>;
 let services: ServiceBundle;
 let templateService: TemplateService;
 
-function renderApp(initialEntries: InitialEntries) {
-  return render(
+async function renderApp(initialEntries: InitialEntries) {
+  const rendered = render(
     <MemoryRouter initialEntries={initialEntries}>
       <App services={services} />
     </MemoryRouter>,
   );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return rendered;
 }
 
 function HistoryControls() {
@@ -89,15 +93,15 @@ beforeEach(() => {
 
 describe("application routing", () => {
   it("redirects the root route to the template list", async () => {
-    renderApp([ROUTES.root]);
+    await renderApp([ROUTES.root]);
 
     expect(
       await screen.findByRole("heading", { name: "Templates" }),
     ).toBeInTheDocument();
   });
 
-  it("renders a useful page for an unknown route", () => {
-    renderApp(["/not-a-real-page"]);
+  it("renders a useful page for an unknown route", async () => {
+    await renderApp(["/not-a-real-page"]);
 
     expect(
       screen.getByRole("heading", { name: "Page not found" }),
@@ -112,22 +116,22 @@ describe("application routing", () => {
     [ROUTES.register, "Create account"],
     [ROUTES.workers, "Workers"],
     [ROUTES.profile, "My Profile"],
-  ])("renders the explicit placeholder at %s", (path, heading) => {
-    renderApp([path]);
+  ])("renders the explicit placeholder at %s", async (path, heading) => {
+    await renderApp([path]);
     expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
     expect(screen.getByText(/implemented in a later Stage A commit/i))
       .toBeInTheDocument();
   });
 
-  it("mounts the ordinary Report Editor with its seed fixtures", () => {
-    renderApp([ROUTES.generateReport]);
+  it("mounts the ordinary Report Editor with its seed fixtures", async () => {
+    await renderApp([ROUTES.generateReport]);
 
     expect(screen.getByTestId("fixture-switcher")).toBeInTheDocument();
     expect(screen.queryByText(/Previewing:/)).not.toBeInTheDocument();
   });
 
   it("loads an edit route by URL parameter on direct navigation", async () => {
-    renderApp([routeBuilders.template(templateRecord.id)]);
+    await renderApp([routeBuilders.template(templateRecord.id)]);
 
     expect(await screen.findByDisplayValue(templateRecord.name))
       .toBeInTheDocument();
@@ -137,7 +141,7 @@ describe("application routing", () => {
 
   it("uses a matching navigation-state record without loading it again", async () => {
     const state: TemplateEditNavigationState = { template: templateRecord };
-    renderApp([{
+    await renderApp([{
       pathname: routeBuilders.template(templateRecord.id),
       state,
     }]);
@@ -149,7 +153,7 @@ describe("application routing", () => {
 
   it("opens a listed template and reuses the record already loaded by the list", async () => {
     const user = userEvent.setup();
-    renderApp([ROUTES.templates]);
+    await renderApp([ROUTES.templates]);
 
     await user.click(await screen.findByRole("button", { name: "Open" }));
 
@@ -161,7 +165,7 @@ describe("application routing", () => {
   it("keeps new-template state separate from an edited template", async () => {
     const user = userEvent.setup();
     const state: TemplateEditNavigationState = { template: templateRecord };
-    renderApp([{
+    await renderApp([{
       pathname: routeBuilders.template(templateRecord.id),
       state,
     }]);
@@ -179,7 +183,7 @@ describe("application routing", () => {
 
   it("previews the live builder draft without changing ordinary report visits", async () => {
     const user = userEvent.setup();
-    renderApp([ROUTES.newTemplate]);
+    await renderApp([ROUTES.newTemplate]);
 
     const nameInput = await screen.findByLabelText("Template name");
     await user.type(nameInput, "Live Draft");
