@@ -3,25 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import type { MemoryRouterProps } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TemplateRecord } from "./api/templates";
-import { getTemplate, listTemplates } from "./api/templates";
 import App from "./App";
 import { routeBuilders, ROUTES } from "./config/routes";
 import type { TemplateEditNavigationState } from "./routing/navigationState";
-
-vi.mock("./api/templates", async () => {
-  const actual = await vi.importActual<typeof import("./api/templates")>(
-    "./api/templates",
-  );
-  return {
-    ...actual,
-    getTemplate: vi.fn(),
-    listTemplates: vi.fn(),
-  };
-});
-
-const mockedGetTemplate = vi.mocked(getTemplate);
-const mockedListTemplates = vi.mocked(listTemplates);
+import type {
+  ServiceBundle,
+  TemplateRecord,
+  TemplateService,
+} from "./services/contracts";
+import { createMockServiceBundle } from "./services/createServices";
+import { MemoryStorage } from "./services/mock/MockSessionManager";
 
 const templateRecord: TemplateRecord = {
   id: "template-1",
@@ -43,10 +34,13 @@ const templateRecord: TemplateRecord = {
 
 type InitialEntries = NonNullable<MemoryRouterProps["initialEntries"]>;
 
+let services: ServiceBundle;
+let templateService: TemplateService;
+
 function renderApp(initialEntries: InitialEntries) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
-      <App />
+      <App services={services} />
     </MemoryRouter>,
   );
 }
@@ -66,17 +60,31 @@ function HistoryControls() {
 }
 
 beforeEach(() => {
-  mockedGetTemplate.mockReset();
-  mockedListTemplates.mockReset();
-  mockedGetTemplate.mockResolvedValue(templateRecord);
-  mockedListTemplates.mockResolvedValue([
-    {
-      id: templateRecord.id,
-      name: templateRecord.name,
-      isSeed: templateRecord.isSeed,
-      updatedAt: templateRecord.updatedAt,
-    },
-  ]);
+  templateService = {
+    get: vi.fn().mockResolvedValue(templateRecord),
+    list: vi.fn().mockResolvedValue([
+      {
+        id: templateRecord.id,
+        name: templateRecord.name,
+        isSeed: templateRecord.isSeed,
+        updatedAt: templateRecord.updatedAt,
+      },
+    ]),
+    create: vi.fn().mockImplementation(async (input) => ({
+      ...templateRecord,
+      name: input.name,
+      schema: input.schema,
+    })),
+    update: vi.fn().mockImplementation(async (_id, input) => ({
+      ...templateRecord,
+      name: input.name,
+      schema: input.schema,
+    })),
+  };
+  services = {
+    ...createMockServiceBundle({ storage: new MemoryStorage() }),
+    templates: templateService,
+  };
 });
 
 describe("application routing", () => {
@@ -123,8 +131,8 @@ describe("application routing", () => {
 
     expect(await screen.findByDisplayValue(templateRecord.name))
       .toBeInTheDocument();
-    expect(mockedGetTemplate).toHaveBeenCalledOnce();
-    expect(mockedGetTemplate).toHaveBeenCalledWith(templateRecord.id);
+    expect(templateService.get).toHaveBeenCalledOnce();
+    expect(templateService.get).toHaveBeenCalledWith(templateRecord.id);
   });
 
   it("uses a matching navigation-state record without loading it again", async () => {
@@ -136,7 +144,7 @@ describe("application routing", () => {
 
     expect(await screen.findByDisplayValue(templateRecord.name))
       .toBeInTheDocument();
-    expect(mockedGetTemplate).not.toHaveBeenCalled();
+    expect(templateService.get).not.toHaveBeenCalled();
   });
 
   it("opens a listed template and reuses the record already loaded by the list", async () => {
@@ -147,7 +155,7 @@ describe("application routing", () => {
 
     expect(await screen.findByDisplayValue(templateRecord.name))
       .toBeInTheDocument();
-    expect(mockedGetTemplate).toHaveBeenCalledOnce();
+    expect(templateService.get).toHaveBeenCalledOnce();
   });
 
   it("keeps new-template state separate from an edited template", async () => {
@@ -196,7 +204,7 @@ describe("application routing", () => {
     render(
       <MemoryRouter initialEntries={[ROUTES.templates]}>
         <HistoryControls />
-        <App />
+        <App services={services} />
       </MemoryRouter>,
     );
 

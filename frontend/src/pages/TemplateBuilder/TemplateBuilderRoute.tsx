@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { getTemplate } from "../../api/templates";
-import type { TemplateRecord } from "../../api/templates";
 import { useTemplateDraft } from "../../contexts/TemplateDraftContext";
 import { getNavigatedTemplate } from "../../routing/navigationState";
+import type { TemplateRecord } from "../../services/contracts";
+import { useServices } from "../../services/ServiceProvider";
 import { TemplateBuilderPage } from "./TemplateBuilderPage";
 
 interface TemplateBuilderRouteProps {
@@ -19,6 +19,7 @@ function ExistingTemplateBuilderRoute({
   onSchemaChange,
   onNameChange,
 }: ExistingTemplateBuilderRouteProps) {
+  const { templates: templateService } = useServices();
   const { id } = useParams<"id">();
   const location = useLocation();
   const navigatedTemplate = id
@@ -51,7 +52,7 @@ function ExistingTemplateBuilderRoute({
     setLoading(true);
     setError(null);
 
-    void getTemplate(id)
+    void templateService.get(id)
       .then((loaded) => {
         if (active) setRecord(loaded);
       })
@@ -70,7 +71,7 @@ function ExistingTemplateBuilderRoute({
     return () => {
       active = false;
     };
-  }, [id, loadAttempt, navigatedTemplate]);
+  }, [id, loadAttempt, navigatedTemplate, templateService]);
 
   const retry = useCallback(() => {
     setLoadAttempt((current) => current + 1);

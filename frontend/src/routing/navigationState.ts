@@ -1,4 +1,4 @@
-import type { TemplateRecord } from "../api/templates";
+import type { TemplateRecord } from "../services/contracts";
 
 export interface TemplateEditNavigationState {
   template: TemplateRecord;

@@ -14,7 +14,8 @@
 //   - handles loading and error states for both the list fetch and each open
 //     fetch (a failed open shows a message and does NOT navigate).
 //
-// All backend calls go through frontend/src/api/templates.ts — no direct fetch.
+// All persistence calls go through the injected TemplateService. Components do
+// not know whether that service is backed by the API or development mocks.
 //
 // OUT OF SCOPE here (owned by other tasks):
 //   - TemplateBuilderPage itself (task 11.1) — this page only receives callbacks
@@ -25,10 +26,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getTemplate, listTemplates } from "../../api/templates";
-import type { TemplateSummary } from "../../api/templates";
 import { routeBuilders, ROUTES } from "../../config/routes";
 import type { TemplateEditNavigationState } from "../../routing/navigationState";
+import type { TemplateSummary } from "../../services/contracts";
+import { useServices } from "../../services/ServiceProvider";
 
 // Minimal control styling with large (>=44px) tap targets. Full styling is
 // task 12.1.
@@ -57,6 +58,7 @@ const openButtonStyle: React.CSSProperties = {
 
 export function TemplateListPage() {
   const navigate = useNavigate();
+  const { templates: templateService } = useServices();
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function TemplateListPage() {
     setLoading(true);
     setListError(null);
     try {
-      const summaries = await listTemplates();
+      const summaries = await templateService.list();
       setTemplates(summaries);
     } catch (err) {
       setListError(
@@ -83,7 +85,7 @@ export function TemplateListPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [templateService]);
 
   // Retrieve the list on mount (Req 5.4).
   useEffect(() => {
@@ -98,7 +100,7 @@ export function TemplateListPage() {
       setOpeningId(id);
       setOpenError(null);
       try {
-        const record = await getTemplate(id);
+        const record = await templateService.get(id);
         const state: TemplateEditNavigationState = { template: record };
         navigate(routeBuilders.template(record.id), { state });
       } catch (err) {
@@ -111,7 +113,7 @@ export function TemplateListPage() {
         setOpeningId(null);
       }
     },
-    [navigate],
+    [navigate, templateService],
   );
 
   return (

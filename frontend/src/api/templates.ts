@@ -8,27 +8,15 @@
 // ./types, so the builder, this client, and the backend all reference one
 // schema shape.
 
-import type { TemplateSchema } from "./types";
 import { endpointBuilders, API_ENDPOINTS } from "../config/endpoints";
 import { frontendConfig } from "../config/env";
+import type {
+  TemplateRecord,
+  TemplateSummary,
+  TemplateWriteInput,
+} from "../services/contracts";
 
-// A lightweight summary returned by the list endpoint (Req 5.4, 7.3).
-export interface TemplateSummary {
-  id: string;
-  name: string;
-  isSeed: boolean;
-  updatedAt: string;
-}
-
-// A full template record returned by get/create/update (Req 5.1, 5.2, 5.3).
-export interface TemplateRecord {
-  id: string;
-  name: string;
-  schema: TemplateSchema;
-  isSeed: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { TemplateRecord, TemplateSummary } from "../services/contracts";
 
 // The structured body the backend returns on a 422 validation failure. The
 // builder maps this to a message and highlights the offending element via
@@ -156,17 +144,14 @@ export function getTemplate(id: string): Promise<TemplateRecord> {
 }
 
 // POST /api/templates — create a new template (Req 5.1).
-export function createTemplate(input: {
-  name: string;
-  schema: TemplateSchema;
-}): Promise<TemplateRecord> {
+export function createTemplate(input: TemplateWriteInput): Promise<TemplateRecord> {
   return request<TemplateRecord>("POST", API_ENDPOINTS.templates, input);
 }
 
 // PUT /api/templates/{id} — update an existing template (Req 5.3).
 export function updateTemplate(
   id: string,
-  input: { name: string; schema: TemplateSchema },
+  input: TemplateWriteInput,
 ): Promise<TemplateRecord> {
   return request<TemplateRecord>("PUT", endpointBuilders.template(id), input);
 }
