@@ -1,0 +1,183 @@
+/*
+ * theme.css — the mobile-first, high-contrast base stylesheet + design tokens
+ * for Report Mate (task 12.1, Req 8.1-8.4).
+ *
+ * This is the ONE place field-conditions UI rules live (src/styles/README.md).
+ * It is imported once in src/main.tsx so it applies across the app and is part
+ * of the Vite build graph.
+ *
+ * Contents:
+ *   1. Design tokens as CSS custom properties (--rm-*), mirroring tokens.ts.
+ *   2. A small, mobile-first reset/base (box-sizing, >=16px body font, fluid
+ *      layout, no horizontal overflow), scaling up via min-width media queries.
+ *   3. Utility classes the Template Builder consumes (large tap targets, choice
+ *      controls, contrast-checked text/controls).
+ *
+ * Requirement mapping:
+ *   8.1 responsive/mobile-first ...... :root font-size, box-sizing, .rm-page,
+ *                                        media queries below.
+ *   8.2 >=44x44 tap targets .......... --rm-tap-target + .rm-touch / control rules.
+ *   8.3 >=4.5:1 contrast ............. the --rm-color-* pairs (see tokens.ts for
+ *                                        the computed ratios).
+ *   8.4 large choice controls ........ .rm-choice / .rm-choice__option (no native
+ *                                        <select> is used for choices anywhere in
+ *                                        the builder).
+ */
+
+:root {
+  /* --- Tap target (Req 8.2) --- */
+  --rm-tap-target: 44px;
+
+  /* --- Spacing --- */
+  --rm-space-xs: 4px;
+  --rm-space-sm: 8px;
+  --rm-space-md: 12px;
+  --rm-space-lg: 16px;
+  --rm-space-xl: 24px;
+
+  /* --- Font sizes (base >=16px to avoid mobile input zoom, Req 8.1) --- */
+  --rm-font-xs: 12px;
+  --rm-font-sm: 14px;
+  --rm-font-base: 16px;
+  --rm-font-lg: 18px;
+  --rm-font-xl: 24px;
+
+  /* --- Radius --- */
+  --rm-radius-sm: 6px;
+  --rm-radius-md: 8px;
+  --rm-radius-lg: 12px;
+
+  /* --- Colors (contrast-verified pairs, Req 8.3 — see tokens.ts) --- */
+  --rm-color-page-bg: #f5f6f8;
+  --rm-color-surface: #ffffff;
+  --rm-color-surface-muted: #fafbfc;
+  --rm-color-text: #1a1a1a;
+  --rm-color-text-muted: #4a5160;
+  --rm-color-border: #3a3f4b;
+  --rm-color-border-subtle: #c7ccd6;
+  --rm-color-primary: #14477f;
+  --rm-color-primary-hover: #0d3560;
+  --rm-color-on-primary: #ffffff;
+  --rm-color-danger: #a01b0e;
+  --rm-color-danger-hover: #7d150a;
+  --rm-color-on-danger: #ffffff;
+  --rm-color-danger-text: #a01b0e;
+  --rm-color-success-text: #12692b;
+  --rm-color-accent: #14477f;
+  --rm-color-drop-highlight: #dbe8ff;
+  --rm-color-seed-badge-bg: #e6f0fb;
+}
+
+/* --- Mobile-first reset / base (Req 8.1) --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Base font >=16px so focusing an input doesn't trigger mobile auto-zoom. */
+  font-size: var(--rm-font-base);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  /* Fluid, phone-first layout; nothing overflows the viewport horizontally. */
+  min-width: 0;
+  overflow-x: hidden;
+  background: var(--rm-color-page-bg);
+  color: var(--rm-color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: var(--rm-font-base);
+  line-height: 1.5;
+}
+
+/* Media never forces horizontal scroll on narrow screens. */
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Controls inherit the readable base font so mobile browsers don't shrink or
+   zoom them; >=16px avoids iOS focus-zoom on inputs. */
+input,
+button,
+textarea {
+  font: inherit;
+  font-size: var(--rm-font-base);
+  color: inherit;
+}
+
+/* A visible, high-contrast focus ring for keyboard users (accessibility). */
+:where(button, input, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--rm-color-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * The mobile-first page container: full-width with comfortable padding on a
+ * phone, then capped and centered on wider viewports (Req 8.1). The builder and
+ * list pages use this so their layout is single-column on mobile and scales up.
+ */
+.rm-page {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: var(--rm-space-lg);
+}
+
+@media (min-width: 600px) {
+  .rm-page {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 900px) {
+  .rm-page {
+    max-width: 840px;
+    padding: var(--rm-space-xl);
+  }
+}
+
+/* --- Tap-target utility (Req 8.2): >=44x44 CSS px hit area. --- */
+.rm-touch {
+  min-width: var(--rm-tap-target);
+  min-height: var(--rm-tap-target);
+}
+
+/*
+ * --- Choice controls (Req 8.4) ---
+ * Choices among options are rendered as a group of large tap-target buttons,
+ * NOT a small native <select>. These classes back that pattern; the builder's
+ * choice-style controls stay well above 44px and never fall back to a native
+ * dropdown for a choice.
+ */
+.rm-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rm-space-sm);
+}
+
+.rm-choice__option {
+  min-width: var(--rm-tap-target);
+  min-height: var(--rm-tap-target);
+  padding: var(--rm-space-sm) var(--rm-space-md);
+  font-size: var(--rm-font-base);
+  border: 1px solid var(--rm-color-border);
+  border-radius: var(--rm-radius-md);
+  background: var(--rm-color-surface);
+  color: var(--rm-color-text);
+  cursor: pointer;
+}
+
+.rm-choice__option[aria-pressed="true"],
+.rm-choice__option[data-selected="true"] {
+  background: var(--rm-color-primary);
+  color: var(--rm-color-on-primary);
+  border-color: var(--rm-color-primary-hover);
+}

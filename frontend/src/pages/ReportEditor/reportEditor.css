@@ -1,0 +1,139 @@
+/*
+ * reportEditor.css — A4 page layout + print rules for the Report Renderer.
+ *
+ * The fill surface is laid out as A4 "sheets" (210 x 297mm) so what a technician
+ * fills on screen matches the page geometry of the later PDF export. On screen
+ * the sheets sit on a grey backdrop with a shadow (a document-preview look);
+ * when printed/exported, the browser paginates across real A4 pages using the
+ * @page + break-* rules below.
+ *
+ * CSS-based pagination with sensible break rules (the chosen approach): we do
+ * NOT manually measure/pack content into pages. Instead we let the print engine
+ * flow content across A4 boundaries and constrain it so a field or section is
+ * not sliced across a page break where avoidable.
+ *
+ * Tokens (--rm-*) come from styles/theme.css, imported app-wide in main.tsx.
+ */
+
+/* --- A4 geometry ----------------------------------------------------------- */
+:root {
+  --rm-a4-width: 210mm;
+  --rm-a4-height: 297mm;
+  /* Comfortable document margins inside the sheet. */
+  --rm-a4-padding: 16mm;
+}
+
+/* The grey preview backdrop that holds the sheets on screen. */
+.rm-a4-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rm-space-lg);
+  padding: var(--rm-space-lg);
+  background: #e4e6ea;
+  /* Let very wide field controls (e.g. the signature canvas) size to the sheet
+     rather than the viewport. */
+  width: 100%;
+}
+
+/*
+ * One A4 sheet. On screen this is a fixed-width white page with the document
+ * padding inside. min-height (not height) so a sheet can grow if its content is
+ * taller than one physical page — the print rules then paginate the overflow.
+ */
+.rm-a4-page {
+  box-sizing: border-box;
+  width: var(--rm-a4-width);
+  min-height: var(--rm-a4-height);
+  max-width: 100%;
+  padding: var(--rm-a4-padding);
+  background: var(--rm-color-surface);
+  color: var(--rm-color-text);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  /* A sheet should start on a fresh printed page. */
+  break-before: page;
+}
+
+.rm-a4-page:first-child {
+  break-before: auto;
+}
+
+/* The document header block at the top of the first sheet. */
+.rm-report-header {
+  margin-bottom: var(--rm-space-xl);
+  padding-bottom: var(--rm-space-md);
+  border-bottom: 3px solid var(--rm-color-primary);
+}
+
+.rm-report-header h1 {
+  margin: 0 0 var(--rm-space-xs);
+  font-size: var(--rm-font-xl);
+}
+
+.rm-report-meta {
+  margin: 0;
+  color: var(--rm-color-text-muted);
+  font-size: var(--rm-font-sm);
+}
+
+/* --- Sections & fields ----------------------------------------------------- */
+/*
+ * A section is a break-avoid group: keep its heading with at least the start of
+ * its content, and try not to slice the whole section across a page boundary.
+ * break-inside: avoid is a hint the print engine honors when the section fits;
+ * a section taller than a page will still split (unavoidable), but never right
+ * after its heading (see the heading rule).
+ */
+.rm-report-section {
+  margin-bottom: var(--rm-space-xl);
+  break-inside: avoid;
+}
+
+.rm-report-section > h2 {
+  break-after: avoid; /* keep a section heading with the field beneath it */
+}
+
+/*
+ * A single field is the smallest unit we refuse to split: a label must never be
+ * orphaned from its control across a page break.
+ */
+.rm-report-field {
+  margin-bottom: var(--rm-space-lg);
+  break-inside: avoid;
+}
+
+/* --- Print / export rules -------------------------------------------------- */
+/* Anything editing-only (add/remove buttons, the toolbar) is hidden in print so
+ * the exported document is clean. Components tag such controls with .rm-no-print. */
+@media print {
+  .rm-no-print {
+    display: none !important;
+  }
+
+  .rm-a4-canvas {
+    background: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  .rm-a4-page {
+    width: auto;
+    min-height: auto;
+    box-shadow: none;
+    padding: 0;
+    /* @page owns the physical margins in print; the sheet padding is dropped. */
+  }
+
+  /* Define the physical page size + margin for export. */
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  /* Keep media and signatures whole on the page. */
+  .rm-report-field img,
+  .rm-report-field canvas,
+  .rm-report-field figure {
+    break-inside: avoid;
+  }
+}
