@@ -1,12 +1,28 @@
 // Typed API client for report templates.
 //
 // This module is the ONLY path from the frontend to the backend for template
-// operations (Req 5.7). All fetch calls are centralized in the internal
-// `request` helper below — no component should call `fetch` directly.
+// operations (Req 5.7). All fetch calls go through the shared `request` helper
+// in ./client — no component should call `fetch` directly.
+//
+// The helper and the typed error classes used to live in this file; they moved
+// to ./client when the reports/dashboard/attachments clients needed the same
+// ones. This module's exported surface is unchanged: it re-exports those error
+// types so importers see no difference.
 //
 // The client is typed against the shared `TemplateSchema` contract in
 // ./types, so the builder, this client, and the backend all reference one
 // schema shape.
+
+import { request } from "./client";
+// The error contract lives in ./client now (it is shared by every api/* module).
+// Re-exported here so existing importers — the builder catches all three by
+// name from this module — keep working unchanged.
+export {
+  ApiValidationError,
+  ApiAuthorizationError,
+  ApiError,
+} from "./client";
+export type { ValidationError } from "./client";
 
 import type { TemplateSchema } from "./types";
 
@@ -26,123 +42,6 @@ export interface TemplateRecord {
   isSeed: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-// The structured body the backend returns on a 422 validation failure. The
-// builder maps this to a message and highlights the offending element via
-// `elementId` (Req 5.6).
-export interface ValidationError {
-  code: "validation_error";
-  message: string;
-  elementId: string | null; // offending field/section id when applicable
-}
-
-// Typed rejection carrying the backend's ValidationError body (HTTP 422). The
-// builder catches this to surface the message and highlight `elementId`.
-export class ApiValidationError extends Error {
-  readonly code = "validation_error" as const;
-  readonly elementId: string | null;
-
-  constructor(body: ValidationError) {
-    super(body.message);
-    this.name = "ApiValidationError";
-    this.elementId = body.elementId;
-    // Restore the prototype chain when targeting older transpile settings.
-    Object.setPrototypeOf(this, ApiValidationError.prototype);
-  }
-}
-
-// Typed rejection for an authorization failure (HTTP 403). Surfaced distinctly
-// so the builder can present an access-denied message (Req 6.1, 6.2).
-export class ApiAuthorizationError extends Error {
-  constructor(message = "You are not authorized to perform this action.") {
-    super(message);
-    this.name = "ApiAuthorizationError";
-    Object.setPrototypeOf(this, ApiAuthorizationError.prototype);
-  }
-}
-
-// Generic rejection for any other non-2xx response.
-export class ApiError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    Object.setPrototypeOf(this, ApiError.prototype);
-  }
-}
-
-// Configurable base URL. The paths below already include the `/api` prefix, so
-// the base defaults to an empty string. Override with VITE_API_BASE_URL (e.g.
-// a full origin) when the API lives on a different host.
-const BASE_URL: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-
-// Type guard for a well-formed ValidationError body.
-function isValidationErrorBody(value: unknown): value is ValidationError {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const body = value as Record<string, unknown>;
-  return (
-    body.code === "validation_error" &&
-    typeof body.message === "string" &&
-    (body.elementId === null || typeof body.elementId === "string")
-  );
-}
-
-// Internal request helper: the single point where fetch is called. It sets the
-// JSON content type, serializes the body, and maps the response to either a
-// parsed value or a typed rejection.
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
-  if (response.ok) {
-    // 204 No Content and empty bodies decode to undefined; callers of this
-    // client always expect a JSON body, but guard against an empty payload.
-    const text = await response.text();
-    return (text ? JSON.parse(text) : undefined) as T;
-  }
-
-  // 422 -> typed validation rejection carrying the ValidationError body.
-  if (response.status === 422) {
-    const parsed = await response.json().catch(() => null);
-    if (isValidationErrorBody(parsed)) {
-      throw new ApiValidationError(parsed);
-    }
-    throw new ApiValidationError({
-      code: "validation_error",
-      message: "The template failed validation.",
-      elementId: null,
-    });
-  }
-
-  // 403 -> distinct authorization rejection.
-  if (response.status === 403) {
-    const parsed = (await response.json().catch(() => null)) as {
-      message?: unknown;
-    } | null;
-    const message =
-      parsed && typeof parsed.message === "string" ? parsed.message : undefined;
-    throw new ApiAuthorizationError(message);
-  }
-
-  // Any other non-2xx -> generic error.
-  const detail = await response.text().catch(() => "");
-  throw new ApiError(
-    response.status,
-    detail || `Request failed with status ${response.status}`,
-  );
 }
 
 // GET /api/templates — list seed and custom templates (Req 5.4, 7.3).
