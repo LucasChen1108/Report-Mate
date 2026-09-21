@@ -23,7 +23,11 @@ func TestSchemaFSExcludesDevelopmentSeeds(t *testing.T) {
 		}
 	}
 
-	for _, required := range []string{"0001_users.sql", "0011_disable_legacy_dev_credentials.sql"} {
+	for _, required := range []string{
+		"0001_users.sql",
+		"0011_disable_legacy_dev_credentials.sql",
+		"0012_stage_b_accounts.sql",
+	} {
 		if !slices.Contains(names, required) {
 			t.Errorf("production schema stream is missing %q", required)
 		}

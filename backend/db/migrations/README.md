@@ -23,13 +23,33 @@ Ordered, additive SQL migrations for the PostgreSQL schema.
 | 0009 | `0009_seed_dev_users.sql` | Historical development seed; excluded from the production schema stream |
 | 0010 | `0010_seed_dev_credentials.sql` | Historical development credentials; excluded from the production schema stream |
 | 0011 | `0011_disable_legacy_dev_credentials.sql` | Clears the known hashes if the historical seeds reached an existing database |
+| 0012 | `0012_stage_b_accounts.sql` | Companies, account ownership, global login identities, authorization codes, and opaque sessions |
 
 Order matters: `service_reports` references `jobs`, `users` and `report_templates`,
 so those come first; `parts_used` and `attachments` reference `service_reports`.
 
-Migrations `0001` through `0011` must be treated as applied/immutable unless the
+Migrations `0001` through `0012` must be treated as applied/immutable unless the
 team has positive evidence that a target database never applied them. New Stage
-B schema work starts at `0012`.
+B migrations start at `0013`.
+
+## Stage B account model
+
+The legacy `users.email` column remains temporarily for compatibility with the
+pre-Stage-B auth store. `user_login_emails` is the new authoritative identity
+index: it stores one normalized row for each personal or company email and its
+primary key enforces global cross-kind uniqueness. New account code must insert
+both identity rows in the same transaction as the user.
+
+Existing users are assigned to the clearly named `Legacy imported accounts`
+company instead of guessing real company or manager relationships. Their one
+known email is imported as a company identity, and their published password is
+disabled by migration `0011`. They are migration-compatible historical owners,
+not production-ready Stage B accounts.
+
+New table UUIDs intentionally have no database default. Stage B stores generate
+them in the application so the schema does not add another extension
+dependency. Authorization codes and sessions store only 32-byte hashes; the raw
+values exist only in the creating response or cookie.
 
 ## How they are applied
 
