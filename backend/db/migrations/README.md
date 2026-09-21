@@ -1,6 +1,6 @@
 # db/migrations/
 
-Ordered, additive SQL migrations for the PostgreSQL schema (AWS Lightsail-managed Postgres).
+Ordered, additive SQL migrations for the PostgreSQL schema.
 
 ## Rules
 
@@ -20,18 +20,36 @@ Ordered, additive SQL migrations for the PostgreSQL schema (AWS Lightsail-manage
 | 0006 | `0006_service_reports.sql` | `service_reports` (template_id + pinned revision + schema snapshot, job, technician, content jsonb, filled_by, status) |
 | 0007 | `0007_parts_used.sql` | `parts_used` (report_id, part, numeric quantity) |
 | 0008 | `0008_attachments.sql` | `attachments` (report_id, field_id, kind, storage_key) |
-| 0009 | `0009_seed_dev_users.sql` | **dev seed** — two fixed-UUID users for the dev identity shim |
+| 0009 | `0009_seed_dev_users.sql` | Historical development seed; excluded from the production schema stream |
+| 0010 | `0010_seed_dev_credentials.sql` | Historical development credentials; excluded from the production schema stream |
+| 0011 | `0011_disable_legacy_dev_credentials.sql` | Clears the known hashes if the historical seeds reached an existing database |
 
 Order matters: `service_reports` references `jobs`, `users` and `report_templates`,
 so those come first; `parts_used` and `attachments` reference `service_reports`.
 
-Slots `0010` and above are unused and reserved for in-flight work.
+Migrations `0001` through `0011` must be treated as applied/immutable unless the
+team has positive evidence that a target database never applied them. New Stage
+B schema work starts at `0012`.
 
 ## How they are applied
 
-There is no migration CLI. `backend/internal/db.Migrate` embeds this directory
-(`embed.go`), applies each unapplied `*.sql` in lexical filename order inside
-its own transaction, and records it in `schema_migrations`. The server runs it
-at startup, so `go run ./cmd/server` against an empty database is all it takes.
+There is no migration CLI. `backend/internal/db.Migrate` consumes the
+production-safe `migrations.SchemaFS`, applies each unapplied schema migration
+in lexical filename order inside its own transaction, and records it in
+`schema_migrations`. The server runs it at startup, so `go run ./cmd/server`
+against an empty database is all it takes.
 
-Seed data (realistic jobs + 2–3 demo templates) lives alongside migrations or in a dedicated seed script — needed for the demo and for next week's agent work.
+`0009` and `0010` remain embedded only as immutable historical files. They are
+filtered out of `SchemaFS` and cannot run during normal server startup. To
+install the disposable accounts on a local development database, explicitly
+run:
+
+```bash
+ENV=development go run ./cmd/devseed
+```
+
+The command refuses production, staging, test, and blank environment values.
+It applies the two fixture files in one transaction without recording them as
+schema migrations. `0011` safely invalidates their published password in any
+database that received the old unconditional seeds; rerun `devseed` afterwards
+only on a disposable development database that intentionally needs them.

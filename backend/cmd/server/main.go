@@ -87,7 +87,7 @@ func run() error {
 	defer pool.Close()
 	log.Printf("server: connected to postgres")
 
-	if err := db.Migrate(startupCtx, pool, migrations.FS); err != nil {
+	if err := db.Migrate(startupCtx, pool, migrations.SchemaFS); err != nil {
 		return err
 	}
 	log.Printf("server: migrations up to date")
