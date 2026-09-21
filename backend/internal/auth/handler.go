@@ -4,181 +4,208 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/LucasChen1108/Report-Mate/backend/internal/accounts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/httpx"
-	"github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/security"
 )
 
-// The stable machine-readable codes on this package's error bodies. They sit
-// alongside httpx's "validation_error" in the same envelope shape.
 const (
 	codeInvalidCredentials = "invalid_credentials"
-	codeUnauthorized       = "unauthorized"
+	codeInactiveAccount    = "inactive_account"
+	codeRateLimited        = "rate_limited"
 )
 
-// invalidCredentialsMessage is the ONE message the login route returns for
-// every credential failure. Unknown email, empty stored hash, wrong password:
-// same status, same code, same message, byte for byte. A route that said "no
-// such user" for one and "wrong password" for the other would be a free
-// account-enumeration oracle for anyone with a list of email addresses.
-const invalidCredentialsMessage = "Invalid email or password."
+const (
+	invalidCredentialsMessage = "Invalid email or password."
+	inactiveAccountMessage    = "This account is inactive. Contact your administrator."
+	defaultLoginLimit         = 5
+	defaultLoginWindow        = time.Minute
+)
 
-// enumerationDecoyHash is a real bcrypt hash, compared against when the email
-// is unknown so the response takes the same few milliseconds it would for a
-// known account. Without it the timing difference between "returned before
-// hashing" and "hashed, then failed" leaks exactly what the identical body
-// above is there to hide. It is a hash of a random string nobody holds; no
-// password verifies against it.
+// A real bcrypt comparison for unknown accounts keeps lookup timing close to
+// the wrong-password path without disclosing an account's existence.
 const enumerationDecoyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
-// Handler serves the /api/auth routes.
 type Handler struct {
-	store  Store
-	issuer *TokenIssuer
+	store    Store
+	sessions *SessionAuthenticator
+	limiter  LoginLimiter
+	now      func() time.Time
+	newToken func() (string, error)
+	newID    func() (string, error)
 }
 
-// NewHandler returns a Handler reading users from store and signing with
-// issuer.
-func NewHandler(store Store, issuer *TokenIssuer) *Handler {
-	return &Handler{store: store, issuer: issuer}
+func NewHandler(store Store, sessions *SessionAuthenticator) *Handler {
+	return &Handler{
+		store:    store,
+		sessions: sessions,
+		limiter:  NewMemoryLoginLimiter(defaultLoginLimit, defaultLoginWindow),
+		now:      time.Now,
+		newToken: security.GenerateOpaqueToken,
+		newID:    security.NewUUID,
+	}
 }
 
-// RegisterRoutes mounts the auth routes onto mux, using Go 1.22+ method +
-// pattern routing to match the rest of the backend.
-//
-// None of them is wrapped in an RBAC guard. /login and /logout are reachable
-// without a token by definition, and /me does its own 401 — the identity
-// middleware attaches a context identity but rejects nothing.
+// RegisterRoutes exposes the canonical Stage A contract. Login and logout are
+// public; /auth/me is explicitly protected so a missing or stale cookie gets a
+// canonical 401 before the handler runs.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
-	mux.HandleFunc("GET /api/auth/me", h.handleMe)
-	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
+	mux.HandleFunc("POST /auth/login", h.handleLogin)
+	mux.Handle("GET /auth/me", h.sessions.Require(http.HandlerFunc(h.handleMe)))
+	mux.HandleFunc("POST /auth/logout", h.handleLogout)
 }
 
-// loginRequest is the POST /api/auth/login body.
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// loginResponse is what a successful login returns: the bearer token the
-// frontend stores under TOKEN_STORAGE_KEY, and the user to seed AuthContext
-// with so the first render after login needs no extra round trip.
-type loginResponse struct {
-	Token string `json:"token"`
-	User  User   `json:"user"`
+type authUser struct {
+	ID            string        `json:"id"`
+	FullName      string        `json:"fullName"`
+	CompanyID     string        `json:"companyId"`
+	CompanyName   string        `json:"companyName"`
+	Phone         string        `json:"phone"`
+	PersonalEmail string        `json:"personalEmail"`
+	CompanyEmail  string        `json:"companyEmail"`
+	Role          accounts.Role `json:"role"`
+	IsActive      bool          `json:"isActive"`
 }
 
-// handleLogin serves POST /api/auth/login.
-//
-// Every credential failure below writes the identical response through
-// writeInvalidCredentials. Resist the urge to make any one of them more helpful.
+func toAuthUser(account accounts.Account) authUser {
+	return authUser{
+		ID: account.ID, FullName: account.FullName,
+		CompanyID: account.CompanyID, CompanyName: account.CompanyName,
+		Phone: account.Phone, PersonalEmail: account.PersonalEmail,
+		CompanyEmail: account.CompanyEmail, Role: account.Role,
+		IsActive: account.IsActive,
+	}
+}
+
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid_request",
 			"The request body must be JSON with an email and a password.")
 		return
 	}
 
-	email := strings.TrimSpace(req.Email)
-	// A blank submission is a client-side mistake, not an enumeration probe,
-	// but it still answers with the same body — a caller cannot learn anything
-	// from it either way, and one response path is one fewer thing to keep in
-	// sync.
+	email := accounts.NormalizeEmail(req.Email)
 	if email == "" || req.Password == "" {
 		writeInvalidCredentials(w)
 		return
 	}
 
-	user, passwordHash, err := h.store.FindByEmail(r.Context(), email)
+	now := h.now()
+	if !h.limiter.Allow(loginRateLimitKey(r, email), now) {
+		w.Header().Set("Retry-After", "60")
+		httpx.WriteError(w, http.StatusTooManyRequests, codeRateLimited,
+			"Too many login attempts. Please try again shortly.")
+		return
+	}
+
+	credentials, err := h.store.FindCredentialsByEmail(r.Context(), email)
 	if err != nil {
-		if !errors.Is(err, ErrUserNotFound) {
-			// A real database failure. Log it (no email, no password) and
-			// answer 500 — telling a caller "the database is down" is fine;
-			// answering 401 here would be a lie that hides an outage.
+		if !errors.Is(err, accounts.ErrNotFound) {
 			log.Printf("auth: login lookup failed: %v", err)
 			httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
 				"Something went wrong. Please try again.")
 			return
 		}
-		// Unknown email: burn the same time a real comparison would, then
-		// answer exactly as a wrong password does.
 		_ = VerifyPassword(enumerationDecoyHash, req.Password)
 		writeInvalidCredentials(w)
 		return
 	}
-
-	if err := VerifyPassword(passwordHash, req.Password); err != nil {
+	if err := VerifyPassword(credentials.PasswordHash, req.Password); err != nil {
 		writeInvalidCredentials(w)
 		return
 	}
-
-	token, _, err := h.issuer.Issue(user.ID, user.Role)
-	if err != nil {
-		log.Printf("auth: issue token: %v", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
-			"Something went wrong. Please try again.")
+	if !credentials.Account.IsActive {
+		httpx.WriteError(w, http.StatusForbidden, codeInactiveAccount, inactiveAccountMessage)
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, loginResponse{Token: token, User: user})
-}
-
-// handleMe serves GET /api/auth/me: the account behind the request's token, or
-// 401 when the request carries no usable identity.
-//
-// It reads the id back out of the request context rather than re-parsing the
-// header, so it validates the exact same thing every other handler sees. It
-// then re-reads the user from the database instead of reconstructing them from
-// the claims: a token outlives a deleted or renamed account, and /me is
-// precisely where the frontend expects the truth (it is the mount-time check
-// that decides whether a restored token is still good).
-func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		writeUnauthorized(w)
-		return
-	}
-
-	user, err := h.store.FindByID(r.Context(), userID)
-	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			// Valid signature, account gone. 401 so the client drops the token.
-			writeUnauthorized(w)
+	// A successful login replaces any session already presented by this
+	// browser. Revocation happens before issuance so the old token cannot remain
+	// valid if creating the replacement fails.
+	if oldHash, ok := h.sessions.TokenHash(r); ok {
+		if err := h.store.RevokeSession(r.Context(), oldHash, now); err != nil {
+			log.Printf("auth: rotate session: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
+				"Something went wrong. Please try again.")
 			return
 		}
-		log.Printf("auth: me lookup failed: %v", err)
+	}
+
+	rawToken, err := h.newToken()
+	if err != nil {
+		log.Printf("auth: generate session token: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
+			"Something went wrong. Please try again.")
+		return
+	}
+	sessionID, err := h.newID()
+	if err != nil {
+		log.Printf("auth: generate session id: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
+			"Something went wrong. Please try again.")
+		return
+	}
+	expiresAt := now.Add(h.sessions.options.TTL)
+	if err := h.store.CreateSession(r.Context(), credentials.Account.ID, accounts.NewSession{
+		ID: sessionID, TokenHash: security.HashSecret(rawToken), ExpiresAt: expiresAt,
+	}, now); err != nil {
+		log.Printf("auth: create session: %v", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
 			"Something went wrong. Please try again.")
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, user)
+	h.sessions.SetCookie(w, rawToken, expiresAt, now)
+	httpx.WriteJSON(w, http.StatusOK, toAuthUser(credentials.Account))
 }
 
-// handleLogout serves POST /api/auth/logout.
-//
-// It is honest about doing nothing server-side. These are stateless JWTs with
-// no deny list, so signing out IS the client dropping its token; the route
-// exists so the frontend has a symmetric call to make and so a future
-// server-side revocation has an obvious place to live. It answers 204 for any
-// caller, token or not — "you are signed out" is true either way.
-func (h *Handler) handleLogout(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
+	account, ok := accountFromContext(r.Context())
+	if !ok {
+		writeAuthenticationFailure(w, errNoSessionCookie)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, toAuthUser(account))
+}
+
+func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
+	now := h.now()
+	tokenHash, ok := h.sessions.TokenHash(r)
+	// Always clear the browser cookie, including for malformed, expired, or
+	// already-revoked tokens. Logout remains idempotent.
+	h.sessions.ClearCookie(w)
+	if ok {
+		if err := h.store.RevokeSession(r.Context(), tokenHash, now); err != nil {
+			log.Printf("auth: revoke session: %v", err)
+			httpx.WriteError(w, http.StatusInternalServerError, "internal_error",
+				"Something went wrong. Please try again.")
+			return
+		}
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// writeInvalidCredentials writes THE credential-failure response. Every login
-// failure path calls this one function, which is what guarantees the responses
-// are identical rather than merely similar.
-func writeInvalidCredentials(w http.ResponseWriter) {
-	httpx.WriteError(w, http.StatusUnauthorized, codeInvalidCredentials, invalidCredentialsMessage)
+func loginRateLimitKey(r *http.Request, normalizedEmail string) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	return host + "|" + normalizedEmail
 }
 
-// writeUnauthorized writes the 401 for a request that carries no valid identity.
-func writeUnauthorized(w http.ResponseWriter) {
-	httpx.WriteError(w, http.StatusUnauthorized, codeUnauthorized,
-		"You must be signed in to do that.")
+func writeInvalidCredentials(w http.ResponseWriter) {
+	httpx.WriteError(w, http.StatusUnauthorized, codeInvalidCredentials, invalidCredentialsMessage)
 }

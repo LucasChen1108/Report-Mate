@@ -1,30 +1,23 @@
-// Package auth authenticates requests and issues the tokens that carry an
-// identity between the browser and the API.
+// Package auth authenticates requests with revocable, opaque cookie sessions.
 //
-// It occupies the seam the (now deleted) middleware.DevIdentity shim held open:
-// Middleware reads a bearer token off the request, validates it, and populates
-// BOTH middleware.WithUserID and middleware.WithRole into the request context.
-// Every downstream handler already reads identity through those two accessors,
-// so nothing outside this package had to change when real auth landed.
+// The browser receives the raw token only in an HttpOnly cookie. PostgreSQL
+// stores its SHA-256 digest, and every authenticated request reloads the active
+// account so deactivation, role changes, and ownership changes apply at once.
 //
 // The pieces:
 //
-//	password.go   bcrypt hashing and verification (never log a password/hash)
-//	jwt.go        HS256 issue/parse, signed with JWT_SIGNING_KEY
-//	store.go      user lookup by email (CITEXT) and by id
-//	middleware.go the request-context identity middleware
-//	handler.go    POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout
-//	install.go    Install: one call that wires all of the above into cmd/server
+//	password.go   bcrypt verification (never log a password or hash)
+//	store.go      narrow account/session repository contract
+//	middleware.go cookie validation and request-context identity
+//	handler.go    POST /auth/login, GET /auth/me, POST /auth/logout
+//	ratelimit.go process-local login attempt limiting
+//	install.go    one call that wires the feature into cmd/server
 //
-// AUTHENTICATE, DON'T AUTHORIZE. Middleware never rejects a request. A request
-// with no token, an expired token, a tampered token or an "alg: none" token
-// simply proceeds WITHOUT an identity, and the existing per-route rules decide
-// what that means: middleware.RequireRole answers 403 when no role is present,
-// and the handlers that need a user id answer 401 when none is. Keeping the
-// rejection decision with the routes is what lets /api/auth/login stay reachable
-// without a token while everything else stays gated.
+// Optional middleware lets public routes run anonymously. Protected routes use
+// Require, which rejects absent, malformed, expired, revoked, deleted-user, or
+// inactive-user sessions with 401 before invoking the handler.
 //
-// ENUMERATION. A wrong password and an unknown email produce a byte-identical
-// response, and the login path runs a bcrypt comparison even when no user was
-// found, so neither the body nor the response time distinguishes the two.
+// A wrong password and an unknown email produce a byte-identical response, and
+// the login path runs a bcrypt comparison even when no user was found, so
+// neither the body nor the response time distinguishes the two.
 package auth

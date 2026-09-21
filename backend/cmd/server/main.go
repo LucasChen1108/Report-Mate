@@ -102,7 +102,7 @@ func run() error {
 	dashboardHandler.RegisterRoutes(mux)
 	mountReports(mux, reports.NewHandler(pool))
 
-	identity := auth.Install(mux, pool, cfg.JWTSigningKey)
+	identity := auth.Install(mux, pool, cfg.IsProduction())
 
 	// The identity middleware wraps the whole mux so every route — including
 	// the RBAC-gated template writes, which read the role back out of the
