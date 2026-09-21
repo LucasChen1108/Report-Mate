@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/LucasChen1108/Report-Mate/backend/internal/httpx"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
 )
 
@@ -22,23 +23,6 @@ const dispatcherAdminRole = "dispatcher_admin"
 type templateRequest struct {
 	Name   string         `json:"name"`
 	Schema TemplateSchema `json:"schema"`
-}
-
-// validationErrorBody is the JSON body returned on a 422 validation failure. It
-// mirrors the frontend api/templates.ts ValidationError type: a stable code, a
-// human-readable message, and the offending element id (null when the failure
-// is structural and names no element).
-type validationErrorBody struct {
-	Code      string  `json:"code"`
-	Message   string  `json:"message"`
-	ElementID *string `json:"elementId"`
-}
-
-// errorBody is the generic JSON error envelope used for decode (400), not-found
-// (404), and internal (500) responses.
-type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
 }
 
 // Handler serves the report_templates HTTP routes. It decodes and validates
@@ -74,7 +58,7 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, summaries)
+	httpx.WriteJSON(w, http.StatusOK, summaries)
 }
 
 // handleGet serves GET /api/templates/{id}. Any authenticated user may load a
@@ -87,7 +71,7 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, record)
+	httpx.WriteJSON(w, http.StatusOK, record)
 }
 
 // handleCreate serves POST /api/templates. It decodes the body, validates the
@@ -107,7 +91,7 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, record)
+	httpx.WriteJSON(w, http.StatusCreated, record)
 }
 
 // handleUpdate serves PUT /api/templates/{id}. It decodes the body, validates
@@ -129,7 +113,7 @@ func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, record)
+	httpx.WriteJSON(w, http.StatusOK, record)
 }
 
 // decodeRequest reads and decodes the JSON request body into a templateRequest.
@@ -142,7 +126,7 @@ func decodeRequest(w http.ResponseWriter, r *http.Request) (templateRequest, boo
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "request body could not be decoded")
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "request body could not be decoded")
 		return templateRequest{}, false
 	}
 	return req, true
@@ -157,21 +141,21 @@ func validateRequest(w http.ResponseWriter, req templateRequest) bool {
 	// Empty template name backstop (Req 5.5). The name carries no element id,
 	// so elementId is reported as null.
 	if strings.TrimSpace(req.Name) == "" {
-		writeValidationError(w, "template name is required", nil)
+		httpx.WriteValidationError(w, "template name is required", nil)
 		return false
 	}
 
 	if err := Validate(req.Schema); err != nil {
 		var verr *ValidationError
 		if errors.As(err, &verr) {
-			writeValidationError(w, verr.Message, elementIDPtr(verr.Element))
+			httpx.WriteValidationError(w, verr.Message, elementIDPtr(verr.Element))
 			return false
 		}
 		// Validate only ever returns *ValidationError or nil; a non
 		// *ValidationError is unexpected. Treat it as an internal error rather
 		// than leaking details.
 		log.Printf("templates: unexpected validate error: %v", err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 		return false
 	}
 	return true
@@ -192,36 +176,9 @@ func elementIDPtr(element string) *string {
 // the underlying detail is logged server-side and never leaked to the client.
 func writeStoreError(w http.ResponseWriter, err error) {
 	if errors.Is(err, ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not_found", "template not found")
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "template not found")
 		return
 	}
 	log.Printf("templates: store error: %v", err)
-	writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
-}
-
-// writeValidationError writes a 422 response with the validation_error body,
-// naming the offending element (null when structural).
-func writeValidationError(w http.ResponseWriter, message string, elementID *string) {
-	writeJSON(w, http.StatusUnprocessableEntity, validationErrorBody{
-		Code:      "validation_error",
-		Message:   message,
-		ElementID: elementID,
-	})
-}
-
-// writeError writes a generic error envelope with the given status, code, and
-// message.
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, errorBody{Code: code, Message: message})
-}
-
-// writeJSON encodes body as JSON with the given status code. If encoding fails
-// after the status line has been written there is nothing further to do but log
-// it server-side.
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(body); err != nil {
-		log.Printf("templates: encode response: %v", err)
-	}
+	httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 }

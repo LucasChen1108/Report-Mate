@@ -1,20 +1,23 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthProvider";
+import { USER_ROLES } from "./auth/contracts";
 import { AppLayout } from "./components/AppLayout";
 import { PublicOnlyRoute } from "./components/PublicOnlyRoute";
 import { RequireAuth } from "./components/RequireAuth";
 import { RequireRole } from "./components/RequireRole";
 import { RoutePlaceholder } from "./components/RoutePlaceholder";
-import { USER_ROLES } from "./auth/contracts";
 import { ROUTES } from "./config/routes";
 import { TemplateDraftProvider } from "./contexts/TemplateDraftContext";
+import { DashboardPage } from "./pages/Dashboard/DashboardPage";
+import { TemplateReportsPage } from "./pages/Dashboard/TemplateReportsPage";
 import { LoginPage } from "./pages/Login/LoginPage";
 import { RegistrationPage } from "./pages/Login/RegistrationPage";
-import { ReportEditorRoute } from "./pages/ReportEditor/ReportEditorRoute";
 import { WorkerProfilePage } from "./pages/Profile/WorkerProfilePage";
+import { ReportEditorRoute as PreviewReportEditorRoute } from "./pages/ReportEditor/ReportEditorRoute";
 import { TemplateBuilderRoute } from "./pages/TemplateBuilder/TemplateBuilderRoute";
 import { TemplateListPage } from "./pages/TemplateList/TemplateListPage";
 import { WorkerManagementPage } from "./pages/Workers/WorkerManagementPage";
+import { ReportEditorRoute as PersistedReportEditorRoute } from "./routes/ReportEditorRoute";
 import type { ServiceBundle } from "./services/contracts";
 import { configuredServices } from "./services/createServices";
 import { ServiceProvider } from "./services/ServiceProvider";
@@ -34,21 +37,28 @@ function App({ services = configuredServices }: AppProps) {
                 path={ROUTES.root}
                 element={<Navigate to={ROUTES.login} replace />}
               />
-              <Route
-                path={ROUTES.login}
-                element={<LoginPage />}
-              />
-              <Route
-                path={ROUTES.register}
-                element={<RegistrationPage />}
-              />
+              <Route path={ROUTES.login} element={<LoginPage />} />
+              <Route path={ROUTES.register} element={<RegistrationPage />} />
             </Route>
 
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
                 <Route
                   path={ROUTES.generateReport}
-                  element={<ReportEditorRoute />}
+                  element={<PreviewReportEditorRoute />}
+                />
+                <Route path={ROUTES.dashboard} element={<DashboardPage />} />
+                <Route
+                  path={ROUTES.dashboardTemplate}
+                  element={<TemplateReportsPage />}
+                />
+                <Route
+                  path={ROUTES.newReport}
+                  element={<PersistedReportEditorRoute />}
+                />
+                <Route
+                  path={ROUTES.reportDetail}
+                  element={<PersistedReportEditorRoute />}
                 />
 
                 <Route element={<RequireRole requiredRole={USER_ROLES.admin} />}>

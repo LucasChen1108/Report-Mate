@@ -16,6 +16,11 @@ describe("authentication navigation policy", () => {
   it.each([
     [ROUTES.generateReport, USER_ROLES.admin, true],
     [ROUTES.generateReport, USER_ROLES.worker, true],
+    [ROUTES.dashboard, USER_ROLES.admin, true],
+    [ROUTES.dashboard, USER_ROLES.worker, true],
+    [routeBuilders.dashboardTemplate("template 1"), USER_ROLES.worker, true],
+    [ROUTES.newReport, USER_ROLES.admin, true],
+    [routeBuilders.report("report 1"), USER_ROLES.worker, true],
     [ROUTES.templates, USER_ROLES.admin, true],
     [ROUTES.newTemplate, USER_ROLES.admin, true],
     [routeBuilders.template("template 1"), USER_ROLES.admin, true],

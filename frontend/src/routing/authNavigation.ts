@@ -38,7 +38,15 @@ export function isRouteAllowedForRole(
   pathname: string,
   role: UserRole,
 ): boolean {
-  if (pathname === ROUTES.generateReport) return true;
+  if (
+    pathname === ROUTES.generateReport ||
+    pathname === ROUTES.dashboard ||
+    pathname === ROUTES.newReport ||
+    matchPath({ path: ROUTES.dashboardTemplate, end: true }, pathname) !== null ||
+    matchPath({ path: ROUTES.reportDetail, end: true }, pathname) !== null
+  ) {
+    return true;
+  }
 
   if (role === USER_ROLES.worker) {
     return pathname === ROUTES.profile;

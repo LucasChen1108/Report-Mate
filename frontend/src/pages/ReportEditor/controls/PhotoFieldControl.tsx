@@ -4,13 +4,25 @@
 // separate field. So this control is an image upload plus a caption text box
 // bundled together, writing a single PhotoValue.
 //
-// No backend yet: the chosen image is read as a data URL via FileReader and held
-// in state, which also makes it directly embeddable in the later PDF export.
-// A real upload swaps FileReader for an upload call returning a storage key.
+// STORAGE: the chosen image becomes an inline base64 data URL held in the
+// report's content JSON. That keeps the export self-contained (the image embeds
+// straight into the printed document, no blob store to stand up) and is the
+// accepted tradeoff for this stage.
+//
+// It is only safe because the image is DOWNSCALED FIRST — see imageDownscale.ts
+// for the full reasoning. A raw phone photo is 2–5 MB, base64 adds a third
+// again, and the server caps a report body at 32 MB, so three untouched photos
+// fail the save on the most thoroughly documented reports. Every file picked
+// here goes through the canvas pipeline before it is written to the value.
+//
+// The write itself is async now (decode + re-encode), so the control carries a
+// "processing" state and an error line; the underlying PhotoValue shape
+// ({dataUrl, caption, fileName}) is unchanged.
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { colors, fontSize, radius, spacing } from "../../../styles/tokens";
 import type { PhotoValue } from "../reportContent";
+import { downscaleImageToDataUrl } from "../imageDownscale";
 import { FieldLabel } from "./TextFieldControl";
 
 interface PhotoFieldControlProps {
@@ -29,22 +41,37 @@ export function PhotoFieldControl({
   onChange,
 }: PhotoFieldControlProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  // True while the picked file is being decoded and re-encoded. Large photos
+  // take a moment on a phone, and a control that looks inert is a control the
+  // technician taps again.
+  const [processing, setProcessing] = useState(false);
+  // Set when an image could not be processed, shown beneath the upload row.
+  // A photo that silently fails to attach is the failure mode to avoid.
+  const [error, setError] = useState<string | null>(null);
 
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onChange({
-        ...value,
-        dataUrl: typeof reader.result === "string" ? reader.result : null,
-        fileName: file.name,
-      });
-    };
-    reader.readAsDataURL(file);
+    setProcessing(true);
+    setError(null);
+    try {
+      const dataUrl = await downscaleImageToDataUrl(file);
+      onChange({ ...value, dataUrl, fileName: file.name });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not attach that image. Try another photo.",
+      );
+      // Clear the input so picking the SAME file again re-fires onChange.
+      if (inputRef.current) inputRef.current.value = "";
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const clearImage = () => {
     onChange({ ...value, dataUrl: null, fileName: undefined });
+    setError(null);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -105,7 +132,10 @@ export function PhotoFieldControl({
           type="file"
           accept="image/*"
           capture="environment"
-          onChange={(e) => handleFile(e.target.files?.[0])}
+          disabled={processing}
+          onChange={(e) => {
+            void handleFile(e.target.files?.[0]);
+          }}
           style={{ fontSize: fontSize.sm }}
         />
         {value.dataUrl && (
@@ -128,6 +158,34 @@ export function PhotoFieldControl({
           </button>
         )}
       </div>
+
+      {processing && (
+        <p
+          role="status"
+          data-testid={`photo-${id}-processing`}
+          style={{
+            margin: `${spacing.xs}px 0 0`,
+            fontSize: fontSize.sm,
+            color: colors.textMuted,
+          }}
+        >
+          Processing photo…
+        </p>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          data-testid={`photo-${id}-error`}
+          style={{
+            margin: `${spacing.xs}px 0 0`,
+            fontSize: fontSize.sm,
+            color: colors.dangerText,
+          }}
+        >
+          {error}
+        </p>
+      )}
 
       {/* Optional caption offered alongside the upload (handoff decision 1). */}
       <label htmlFor={`${id}-caption`} style={{ display: "block", marginTop: spacing.sm }}>
