@@ -28,8 +28,8 @@ return empty results until that data lands.
 
 ## Tasks
 
-- [ ] 1. Add gateway configuration seam
-  - [ ] 1.1 Add LLM gateway fields and `AgentConfigured` to `internal/config`
+- [x] 1. Add gateway configuration seam
+  - [x] 1.1 Add LLM gateway fields and `AgentConfigured` to `internal/config`
     - Add `LLMGatewayURL`, `LLMGatewayAPIKey` (SECRET), `LLMModel` to `config.Config` in `backend/internal/config/config.go`
     - Add `const defaultLLMModel = "sonnet4.5"`
     - In `Load`, read `LLM_GATEWAY_URL` / `LLM_GATEWAY_API_KEY` (both optional, `strings.TrimSpace`) and `LLM_MODEL` (via `valueOr(..., defaultLLMModel)`); the server MUST still boot with all three unset
@@ -40,8 +40,8 @@ return empty results until that data lands.
     - Assert `AgentConfigured()` is false when URL or key is blank, true when both set; `LLMModel` defaults to `sonnet4.5`; blank env still loads without error
     - _Requirements: 7.1, 9.1_
 
-- [ ] 2. Implement code-fence stripping and tool-call parsing
-  - [ ] 2.1 Implement `toolCall`, `stripCodeFences`, and `parseToolCall` in `internal/agent/runner.go`
+- [x] 2. Implement code-fence stripping and tool-call parsing
+  - [x] 2.1 Implement `toolCall`, `stripCodeFences`, and `parseToolCall` in `internal/agent/runner.go`
     - Define `toolCall{ Tool, FieldID, Value json.RawMessage, JobID }`
     - `stripCodeFences`: remove a leading ```` ```json ```` / ```` ``` ```` and trailing ```` ``` ````, trim surrounding whitespace, no-op on bare JSON
     - `parseToolCall`: strip fences then unmarshal into a single JSON object with a known `"tool"` field; return an error otherwise
@@ -55,8 +55,8 @@ return empty results until that data lands.
     - Generate non-tool-call strings (prose, partial JSON, arrays); assert `parseToolCall` returns an error
     - **Validates: Requirements 6.5**
 
-- [ ] 3. Implement the run log
-  - [ ] 3.1 Implement `RunLogEntry`, `RunLog`, and its methods in `internal/agent/runlog.go`
+- [x] 3. Implement the run log
+  - [x] 3.1 Implement `RunLogEntry`, `RunLog`, and its methods in `internal/agent/runlog.go`
     - `RunLogEntry{ Seq, Kind, Tool, Args, Result, TotalTokens, Note }`
     - `RunLog{ Entries []RunLogEntry }` with `Chat(totalTokens)`, `Tool(tool, args, result)`, `Terminate(note)`, `TotalTokens()`
     - Append-only with sequential `Seq`; `TotalTokens()` sums across `chat` entries; never holds the gateway key
@@ -66,19 +66,19 @@ return empty results until that data lands.
     - Generate random tool-call + token sequences; assert one ordered entry per dispatch (tool/args/result) and `TotalTokens()` equals the sum of reported usage
     - **Validates: Requirements 8.1, 8.2, 8.3**
 
-- [ ] 4. Implement the context provider seams
-  - [ ] 4.1 Define provider interfaces and empty defaults in `internal/agent/providers.go`
+- [x] 4. Implement the context provider seams
+  - [x] 4.1 Define provider interfaces and empty defaults in `internal/agent/providers.go`
     - `JobHistoryEntry`, `PartsCatalogEntry` DTOs (JSON-tagged as in the design)
     - `JobHistoryProvider` (`History(ctx, jobID *string)`) and `PartsCatalogProvider` (`Catalog(ctx)`)
     - Exported `EmptyJobHistory` / `EmptyPartsCatalog` structs returning an empty slice and nil error
     - _Requirements: 5.3, 5.5_
 
-- [ ] 5. Implement the tool registry and the six tools
-  - [ ] 5.1 Implement `toolResult`, `runState`, `toolRegistry`, and `fillableType` in `internal/agent/tools.go`
+- [x] 5. Implement the tool registry and the six tools
+  - [x] 5.1 Implement `toolResult`, `runState`, `toolRegistry`, and `fillableType` in `internal/agent/tools.go`
     - `toolResult{ Ok, Detail, Data }`, `runState{ schema, content *reports.ReportContent, jobID, jobs, parts, flagged, log }`
     - `toolRegistry` keyed by tool name; `fillableType` reports text|number|select|checklist
     - _Requirements: 2.1, 5.1_
-  - [ ] 5.2 Implement `fill_field` validation and write
+  - [x] 5.2 Implement `fill_field` validation and write
     - Reject a field id not declared by `st.schema`; reject photo/signature; validate by type (text/select = string; select value ∈ options; number parses; checklist = array of strings each ∈ options); write normalized value into `st.content.Values[field_id]` as `json.RawMessage` on success
     - Every rejection leaves content unchanged and records the rejection (id, and value/type where relevant) in the run log; the rejection is fed back to the model as `Ok:false`
     - Mirror `reports.validateValue` rules exactly
@@ -91,7 +91,7 @@ return empty results until that data lands.
     - **Property 2: an accepted fill_field value is type-valid and within declared options**
     - Generate fillable fields + valid/invalid values per type; assert accept iff type-valid and (select/checklist) within options, else stored value unchanged
     - **Validates: Requirements 2.4, 2.5, 2.6**
-  - [ ] 5.5 Implement `flag_missing_field`, `get_template_schema`, `get_job_history`, `get_parts_catalog`
+  - [x] 5.5 Implement `flag_missing_field`, `get_template_schema`, `get_job_history`, `get_parts_catalog`
     - `flag_missing_field`: record the id in `st.flagged`, write no value
     - `get_template_schema`: return sections → fields (id, label, type, required, options) of `st.schema`
     - `get_job_history`: call `st.jobs.History`; return entries or empty + `Ok:true`
@@ -101,13 +101,13 @@ return empty results until that data lands.
     - Concrete accept + reject for `fill_field` per field type; `get_template_schema` returns every field id/type/required; empty providers return `Ok:true` + empty data; `flag_missing_field` records id and writes no value
     - _Requirements: 3.1, 5.1, 5.3, 5.5_
 
-- [ ] 6. Implement the system prompt
-  - [ ] 6.1 Implement the system-prompt builder in `internal/agent/prompt.go`
+- [x] 6. Implement the system prompt
+  - [x] 6.1 Implement the system-prompt builder in `internal/agent/prompt.go`
     - Build a system message describing the loop contract, the six tools and their exact JSON shapes, and the template schema (field ids, labels, types, required flags, options for select/checklist), plus the "reply with ONLY a JSON object" rule
     - _Requirements: 6.3, 6.4, 5.1_
 
-- [ ] 7. Implement the gateway client
-  - [ ] 7.1 Implement `gatewayClient` and its wire types in `internal/agent/client.go`
+- [x] 7. Implement the gateway client
+  - [x] 7.1 Implement `gatewayClient` and its wire types in `internal/agent/client.go`
     - `chatMessage`, `chatRequest` (`stream` always false), `chatResponse`, `chatResult`
     - `newGatewayClient(baseURL, apiKey, model)` with `http.Client{ Timeout: perRequestTimeout }` (`perRequestTimeout = 30s`)
     - `Chat(ctx, messages)`: POST `{baseURL}/v1/chat/completions`, `Authorization: Bearer`, `Content-Type: application/json`; read `choices[0].message.content` + `usage.total_tokens`
@@ -118,8 +118,8 @@ return empty results until that data lands.
     - Assert POST path `/v1/chat/completions`, bearer header, JSON content type, `stream:false`, and that content + total tokens are read; a delayed stub past the 30s client timeout aborts the request
     - _Requirements: 6.1, 6.2, 6.7_
 
-- [ ] 8. Implement the tool-calling loop (runner)
-  - [ ] 8.1 Implement `chatClient`, `Runner`, `RunInput`, `RunResult`, and `Run` in `internal/agent/runner.go`
+- [x] 8. Implement the tool-calling loop (runner)
+  - [x] 8.1 Implement `chatClient`, `Runner`, `RunInput`, `RunResult`, and `Run` in `internal/agent/runner.go`
     - `chatClient` interface (the mockable seam); `Runner{ client, registry, maxIters:10, overall:60s }`
     - `RunInput{ ReportID, Schema, Content (copy), JobID, Account }`; `RunResult{ Content, FlaggedFieldIDs, TotalTokens, TerminatedBy, Saved, Log }`
     - Loop: apply 60s overall context budget; build system + user messages once; up to 10 iterations calling `client.Chat`; accumulate tokens and log each chat; append assistant reply; `parseToolCall`; dispatch through registry; log each dispatch; append tool result as a message
@@ -143,11 +143,11 @@ return empty results until that data lands.
     - Generate sequences of `flag_missing_field` calls with duplicates; assert returned set is the distinct ids and none carries a value in persisted content
     - **Validates: Requirements 3.2, 3.3**
 
-- [ ] 9. Checkpoint - Ensure all backend agent-core tests pass
+- [x] 9. Checkpoint - Ensure all backend agent-core tests pass
   - Run `go build ./...` and `go vet ./...` (prefix PATH with `/opt/homebrew/bin`); ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Implement the `save_draft` persist closure and `filled_by` mapping
-  - [ ] 10.1 Implement `persistFunc` and the `filled_by` computation in `internal/agent/handler.go`
+- [x] 10. Implement the `save_draft` persist closure and `filled_by` mapping
+  - [x] 10.1 Implement `persistFunc` and the `filled_by` computation in `internal/agent/handler.go`
     - Define `persistFunc func(ctx, content reports.ReportContent) error`
     - Compute `filled_by`: prior `""`/`agent` → `agent`; prior `manual`/`mixed` → `mixed`; set `content.FilledBy`; never touch `status`
     - Persist via `reports.ValidateContent(schemaSnapshot, content, false)` then `store.Update(ctx, reportID, UpdateParams{ Content: content, CustomerName: existing.CustomerName, Title: "" })`
@@ -166,8 +166,8 @@ return empty results until that data lands.
     - Generate saved and unsaved runs; assert status is unchanged and never submitted/exported
     - **Validates: Requirements 4.1, 4.2**
 
-- [ ] 11. Implement the Agent_Endpoint handler
-  - [ ] 11.1 Implement `Handler`, request/response types, and `handleAgentFill` in `internal/agent/handler.go`
+- [x] 11. Implement the Agent_Endpoint handler
+  - [x] 11.1 Implement `Handler`, request/response types, and `handleAgentFill` in `internal/agent/handler.go`
     - `Handler{ store *reports.Store, client chatClient (nil when unconfigured), jobs, parts, model }`; `NewHandler(db, client, jobs, parts)`
     - `RegisterRoutes(mux)` mounts `POST /api/reports/{id}/agent-fill`
     - `agentFillRequest{ Account }`; `agentFillResponse{ Report, FlaggedFieldIDs, TokenUsage, TerminatedBy }` — never carries the key
@@ -188,8 +188,8 @@ return empty results until that data lands.
     - Guards: unknown id → 404; non-draft → 422; unconfigured → 503, each with a spy asserting zero gateway calls; overall 60s stall trips the runner deadline and returns unavailable with the draft unchanged
     - _Requirements: 1.1, 1.3, 1.6, 1.7, 3.2, 9.2_
 
-- [ ] 12. Compose the agent into the server
-  - [ ] 12.1 Wire the agent handler in `cmd/server/main.go`
+- [x] 12. Compose the agent into the server
+  - [x] 12.1 Wire the agent handler in `cmd/server/main.go`
     - After loading config: build the gateway client only when `cfg.AgentConfigured()`, else pass `nil`
     - `agentHandler := agent.NewHandler(pool, chat, agent.EmptyJobHistory{}, agent.EmptyPartsCatalog{})`
     - Extend `mountReports` to also register the agent routes on the same `reportsMux` so they inherit the 32MB body limit and identity middleware
@@ -198,11 +198,11 @@ return empty results until that data lands.
     - After an unconfigured agent-fill (503), assert `PUT /api/reports/{id}` still succeeds against the same draft
     - _Requirements: 9.4, 9.5_
 
-- [ ] 13. Checkpoint - Ensure the backend builds and all tests pass
+- [x] 13. Checkpoint - Ensure the backend builds and all tests pass
   - Run `go build ./...`, `go vet ./...`, and `go test ./...` (prefix PATH with `/opt/homebrew/bin`); ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Implement the frontend agent API client
-  - [ ] 14.1 Add `agentFill` and its types in `frontend/src/api/agent.ts`
+- [x] 14. Implement the frontend agent API client
+  - [x] 14.1 Add `agentFill` and its types in `frontend/src/api/agent.ts`
     - `AgentFillInput{ account }`, `AgentFillResponse{ report, flaggedFieldIds, tokenUsage, terminatedBy }`
     - `agentFill(id, input)` calls `request<AgentFillResponse>("POST", \`/api/reports/${encodeURIComponent(id)}/agent-fill\`, input)` through the existing `client.ts` helper — no direct `fetch`, never references the gateway URL or key
     - _Requirements: 7.4_
@@ -210,12 +210,12 @@ return empty results until that data lands.
     - Grep-style assertion: `api/agent.ts` targets the backend route; no frontend source references the gateway URL or key
     - _Requirements: 7.4_
 
-- [ ] 15. Implement the AgentAssistPanel and wire it into the Report Editor
-  - [ ] 15.1 Create `AgentAssistPanel` in `frontend/src/pages/ReportEditor/`
+- [x] 15. Implement the AgentAssistPanel and wire it into the Report Editor
+  - [x] 15.1 Create `AgentAssistPanel` in `frontend/src/pages/ReportEditor/`
     - Multiline free-text input ("Describe the visit…") + a big "Fill with AI" button; disabled while a run is in flight or the account is empty/over 10000 chars
     - On submit call `agentFill(report.id, { account })`; on 503 show "The AI assistant is unavailable right now — you can fill this report in by hand." and leave the form untouched; on 422 show the validation message
     - _Requirements: 4.3, 9.1, 9.4_
-  - [ ] 15.2 Integrate the panel into `ReportEditorPage`
+  - [x] 15.2 Integrate the panel into `ReportEditorPage`
     - Render the panel in `report` mode only (needs a report id; hidden in external/fixture modes, gated like `canSave`)
     - On success feed `report.content` into editor state via `contentFromWire(report.schemaSnapshot, report.content)`; update `customerName`/`filledBy` from the returned record
     - Extend the existing highlight mechanism (`fieldNodes` + `data-highlighted`) to accept a SET of flagged ids alongside the single `highlightedId`; highlight `flaggedFieldIds` (photo/signature required fields the agent could not fill are included in this set)
@@ -225,7 +225,7 @@ return empty results until that data lands.
     - Button disabled while empty/over-length/in-flight; on success content loads via `contentFromWire` and flagged ids are highlighted; a 503 shows the fallback message and leaves the form untouched with manual Save draft still working; the panel is hidden in external/fixture modes
     - _Requirements: 3.2, 4.3, 9.1, 9.4, 9.5_
 
-- [ ] 16. Final checkpoint - Verify backend and frontend
+- [x] 16. Final checkpoint - Verify backend and frontend
   - Backend: `go build ./...`, `go vet ./...`, `go test ./...` (PATH prefixed with `/opt/homebrew/bin`)
   - Frontend: `npm run build` and the typecheck/test scripts (Node/npm via asdf); ensure all tests pass, ask the user if questions arise.
 

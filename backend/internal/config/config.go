@@ -36,6 +36,10 @@ const (
 	// relative path so a checkout runs with no configuration; a deployment
 	// points EXPORT_DIR at a real volume that outlives the process.
 	defaultExportDir = "./var/exports"
+
+	// defaultLLMModel is the model alias the agent requests when LLM_MODEL is
+	// unset. It is not a secret and is safe to publish as a constant.
+	defaultLLMModel = "sonnet4.5"
 )
 
 // ErrMissingDatabaseURL is returned by Load when DATABASE_URL is unset or
@@ -68,6 +72,26 @@ type Config struct {
 	// (env EXPORT_DIR). The reports package writes an HTML snapshot there on
 	// save-and-export and records its path in attachments.storage_key.
 	ExportDir string
+
+	// LLMGatewayURL is the base URL of the organizer-provided LLM gateway
+	// (env LLM_GATEWAY_URL), e.g. https://api.softwaresystems.app. The agent
+	// posts to {LLMGatewayURL}/v1/chat/completions. Optional: when blank the
+	// agent is unconfigured and the server still serves the manual fill path.
+	LLMGatewayURL string
+	// LLMGatewayAPIKey is the bearer key for the gateway (env
+	// LLM_GATEWAY_API_KEY). SECRET — never log it, never return it to the
+	// client. Tied to the team's shared credit pool. Optional at startup.
+	LLMGatewayAPIKey string
+	// LLMModel is the model alias the agent requests (env LLM_MODEL), e.g.
+	// "sonnet4.5". Defaults to defaultLLMModel when unset.
+	LLMModel string
+}
+
+// AgentConfigured reports whether the gateway URL and key are both present.
+// When it returns false the agent is unconfigured and the server serves only
+// the manual fill path.
+func (c Config) AgentConfigured() bool {
+	return c.LLMGatewayURL != "" && c.LLMGatewayAPIKey != ""
 }
 
 // IsProduction reports whether the process is configured as production.
@@ -90,6 +114,13 @@ func Load() (Config, error) {
 		Port:        valueOr(os.Getenv("PORT"), defaultPort),
 		Env:         valueOr(os.Getenv("ENV"), EnvDevelopment),
 		ExportDir:   valueOr(os.Getenv("EXPORT_DIR"), defaultExportDir),
+
+		// The gateway URL and key are optional: the server must boot and serve
+		// the manual fill path with them unset (graceful degradation). LLMModel
+		// always resolves to a usable alias.
+		LLMGatewayURL:    strings.TrimSpace(os.Getenv("LLM_GATEWAY_URL")),
+		LLMGatewayAPIKey: strings.TrimSpace(os.Getenv("LLM_GATEWAY_API_KEY")),
+		LLMModel:         valueOr(os.Getenv("LLM_MODEL"), defaultLLMModel),
 	}
 
 	// The signing key resolves after Env, because whether a missing one is

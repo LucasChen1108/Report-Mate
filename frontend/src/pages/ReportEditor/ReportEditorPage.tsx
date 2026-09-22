@@ -52,8 +52,10 @@ import {
   saveAndExportReport,
   saveReport,
 } from "../../api/reports";
+import type { AgentFillResponse } from "../../api/agent";
 import { colors, fontSize, radius, spacing } from "../../styles/tokens";
 import { A4Document, A4Page, ReportHeader } from "./A4Document";
+import { AgentAssistPanel } from "./AgentAssistPanel";
 import { FieldRenderer } from "./FieldRenderer";
 import { PartsUsedSection } from "./PartsUsedSection";
 import { seedFixtures, sampleHvacContent } from "./fixtures";
@@ -191,6 +193,17 @@ export function ReportEditorPage({
   // elementId the backend named in a 422.
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+  // The set of field ids the agent flagged as unfillable on its last run — the
+  // required fields it could not confidently fill, plus any required
+  // photo/signature fields that need human capture (Req 3.2, 3.4). Highlighted
+  // the same way as `highlightedId` but as a set, so the whole set stays lit
+  // for review rather than just one field. Kept separate from `highlightedId`
+  // so the save-validation highlight and the agent flags do not clobber each
+  // other.
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+
   // DOM nodes of the field wrappers, so a highlight can scroll to its field
   // without a document-wide query.
   const fieldNodes = useRef<Record<string, HTMLDivElement | null>>({});
@@ -223,6 +236,15 @@ export function ReportEditorPage({
   const setFieldValue = useCallback(
     (fieldId: string, next: FieldValue) => {
       noteEdit();
+      // Once the technician edits a field the agent flagged, drop it from the
+      // flagged set — they have addressed it, so it should stop reading as
+      // "needs attention".
+      setFlaggedIds((prev) => {
+        if (!prev.has(fieldId)) return prev;
+        const nextSet = new Set(prev);
+        nextSet.delete(fieldId);
+        return nextSet;
+      });
       setContent((prev) => ({ ...prev, values: { ...prev.values, [fieldId]: next } }));
     },
     [noteEdit],
@@ -236,6 +258,26 @@ export function ReportEditorPage({
     },
     [noteEdit],
   );
+
+  // The agent finished a run and handed back the (reloaded) draft. Load its
+  // content into the SAME editor state a loaded report goes through, so the
+  // agent-filled draft lands in the existing review/edit surface (Req 4.3) —
+  // the technician stays the author of record. Then light up the fields the
+  // agent flagged as unfillable so they know exactly what still needs them
+  // (Req 3.2, 3.4). This is purely additive: the manual Save draft / Save and
+  // Export flow is untouched (Req 9.5).
+  const handleAgentFilled = useCallback((response: AgentFillResponse) => {
+    const filled = response.report;
+    setContent(contentFromWire(filled.schemaSnapshot, filled.content));
+    setCustomerName(filled.customerName ?? "");
+    setFlaggedIds(new Set(response.flaggedFieldIds));
+    // Clear any stale save-validation highlight — the content just changed
+    // wholesale, so a single old highlight no longer refers to anything.
+    setHighlightedId(null);
+    // A fresh draft from the agent has nothing saved yet; drop a stale
+    // saved-at indicator without inventing a new status.
+    setStatus((prev) => (prev.kind === "idle" ? prev : { kind: "idle" }));
+  }, []);
 
   // Map any rejection from the report client to a status. Kept in one place so
   // the draft and export paths report failures identically — the one thing that
@@ -512,6 +554,17 @@ export function ReportEditorPage({
         <A4Page pageNumber={1}>
           <ReportHeader templateName={displayName} metaLines={metaLines} />
 
+          {/* AI assist — only in `report` mode: it needs a persisted report id
+              to run against, so it is hidden in external (builder preview) and
+              fixture (dev) modes, gated the same way the Save actions are on
+              `usingReport`. The panel is additive: it owns its own in-flight /
+              error state and hands the finished draft back through
+              handleAgentFilled, so the manual fill path stays fully
+              independent of the agent (Req 9.5). */}
+          {usingReport && report && (
+            <AgentAssistPanel reportId={report.id} onFilled={handleAgentFilled} />
+          )}
+
           {/* Customer — an editable header field, not a schema field. Jobs are
               not built yet, so this is the only thing that populates the
               dashboard's Customer column. Hidden from the printed document,
@@ -580,7 +633,11 @@ export function ReportEditorPage({
                 </p>
               ) : (
                 section.fields.map((field) => {
-                  const highlighted = highlightedId === field.id;
+                  // A field reads as "needs attention" if it is the single
+                  // save-validation highlight OR one of the agent's flagged
+                  // fields (Req 3.2, 3.4).
+                  const highlighted =
+                    highlightedId === field.id || flaggedIds.has(field.id);
                   return (
                     <div
                       key={field.id}
