@@ -114,6 +114,8 @@ func run() error {
 		cfg.LLMModel,
 		agent.EmptyJobHistory{},
 		agent.EmptyPartsCatalog{},
+		cfg.ConversationTurnCap,
+		cfg.ConversationQuestionCap,
 	)
 
 	mux := http.NewServeMux()

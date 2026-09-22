@@ -13,6 +13,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -40,6 +41,12 @@ const (
 	// defaultLLMModel is the model alias the agent requests when LLM_MODEL is
 	// unset. It is not a secret and is safe to publish as a constant.
 	defaultLLMModel = "sonnet4.5"
+
+	// defaultTurnCap and defaultQuestionCap bound a single agent conversation
+	// so one report can never drain the team's shared credit pool. They apply
+	// whenever their env override is absent or not a positive integer.
+	defaultTurnCap     = 6
+	defaultQuestionCap = 4
 )
 
 // ErrMissingDatabaseURL is returned by Load when DATABASE_URL is unset or
@@ -85,6 +92,16 @@ type Config struct {
 	// LLMModel is the model alias the agent requests (env LLM_MODEL), e.g.
 	// "sonnet4.5". Defaults to defaultLLMModel when unset.
 	LLMModel string
+
+	// ConversationTurnCap is the maximum number of turns in one agent
+	// conversation (env AGENT_CONVERSATION_TURN_CAP). Resolves to
+	// defaultTurnCap when the env value is absent or not a positive integer.
+	ConversationTurnCap int
+	// ConversationQuestionCap is the maximum number of questions the agent may
+	// ask in one conversation (env AGENT_CONVERSATION_QUESTION_CAP). Resolves
+	// to defaultQuestionCap when the env value is absent or not a positive
+	// integer.
+	ConversationQuestionCap int
 }
 
 // AgentConfigured reports whether the gateway URL and key are both present.
@@ -121,6 +138,12 @@ func Load() (Config, error) {
 		LLMGatewayURL:    strings.TrimSpace(os.Getenv("LLM_GATEWAY_URL")),
 		LLMGatewayAPIKey: strings.TrimSpace(os.Getenv("LLM_GATEWAY_API_KEY")),
 		LLMModel:         valueOr(os.Getenv("LLM_MODEL"), defaultLLMModel),
+
+		// The conversation caps bound one agent conversation; a missing or
+		// invalid override falls back to the default rather than an unbounded
+		// or zero cap.
+		ConversationTurnCap:     resolveCap(os.Getenv("AGENT_CONVERSATION_TURN_CAP"), defaultTurnCap),
+		ConversationQuestionCap: resolveCap(os.Getenv("AGENT_CONVERSATION_QUESTION_CAP"), defaultQuestionCap),
 	}
 
 	// The signing key resolves after Env, because whether a missing one is
@@ -139,4 +162,14 @@ func valueOr(value, fallback string) string {
 		return trimmed
 	}
 	return fallback
+}
+
+// resolveCap parses a raw env value into a positive-integer cap, returning def
+// when raw is absent, blank, zero, negative, or non-numeric.
+func resolveCap(raw string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
 }

@@ -401,6 +401,19 @@ func flagArgs(call toolCall) json.RawMessage {
 	return json.RawMessage(encoded)
 }
 
+// askArgs is the arguments record logged for an ask_technician dispatch. It
+// carries the raw question text the model asked (as received) so a rejected or
+// paused turn can be replayed from the Run_Log. ask_technician is intercepted
+// by the runner rather than the registry, so this helper lives here beside the
+// other arg-encoders but is called from runner.go.
+func askArgs(call toolCall) json.RawMessage {
+	args := struct {
+		Question string `json:"question"`
+	}{Question: call.Question}
+	encoded, _ := json.Marshal(args)
+	return json.RawMessage(encoded)
+}
+
 // getTemplateSchemaHandler returns the active template's structure so the model
 // knows which fields exist, their types, whether they are required, and (for
 // select/checklist) their options (Req 5.1). It returns a shaped view rather

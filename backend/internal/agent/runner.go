@@ -24,10 +24,11 @@ import (
 //     number, or array of strings), so it is held as a raw message and decoded
 //     by the fill_field handler.
 type toolCall struct {
-	Tool    string          `json:"tool"`
-	FieldID string          `json:"field_id,omitempty"`
-	Value   json.RawMessage `json:"value,omitempty"`
-	JobID   string          `json:"job_id,omitempty"`
+	Tool     string          `json:"tool"`
+	FieldID  string          `json:"field_id,omitempty"`
+	Value    json.RawMessage `json:"value,omitempty"`
+	JobID    string          `json:"job_id,omitempty"`
+	Question string          `json:"question,omitempty"` // ask_technician
 }
 
 // stripCodeFences removes a surrounding Markdown code fence from s and returns
@@ -159,9 +160,14 @@ type RunInput struct {
 	Schema   templates.TemplateSchema // the draft's schema SNAPSHOT
 	Content  reports.ReportContent    // a COPY of current draft content
 	JobID    *string
-	Account  string // the technician's free-text account
+	Messages []ConversationMessage // full prior transcript; last is the technician's move
 	Jobs     JobHistoryProvider
 	Parts    PartsCatalogProvider
+
+	// QuestionsRemaining is questionCap - questionsUsed for this turn. When it
+	// is zero or negative the agent may ask no further questions: the system
+	// prompt says so and the runner rejects any ask_technician this turn.
+	QuestionsRemaining int
 }
 
 // RunResult is the outcome of a run. Content is the mutated in-memory copy; it
@@ -173,7 +179,17 @@ type RunResult struct {
 	TotalTokens     int
 	TerminatedBy    string
 	Saved           bool
-	Log             *RunLog
+	// AwaitingAnswer is true when the turn ended by emitting a valid
+	// ask_technician question (TerminatedBy == "ask_technician").
+	AwaitingAnswer bool
+	// Question is the validated, trimmed question text, set only when
+	// AwaitingAnswer is true.
+	Question string
+	// Filled is true when any fill_field succeeded during this turn. It is
+	// cumulative across the loop and drives the handler's turn-end persist for a
+	// paused or cap-terminated turn.
+	Filled bool
+	Log    *RunLog
 }
 
 // Run executes the hand-rolled JSON tool-calling loop for one draft (design
@@ -218,12 +234,22 @@ func (r *Runner) Run(ctx context.Context, in RunInput, persist persistFunc) (Run
 		log:     log,
 	}
 
-	// 2. Build the initial transcript: the deterministic system prompt plus the
-	// technician's free-text account. These are set once; the loop appends the
+	// 2. Build the initial transcript deterministically from the conversation
+	// messages the client sent: the system prompt (which states this turn's
+	// remaining question budget), then every ConversationMessage in order,
+	// mapping technician->user and agent->assistant so the model sees its own
+	// prior questions and the technician's answers. The loop appends the
 	// assistant reply and each tool result as it goes.
 	messages := []chatMessage{
-		{Role: "system", Content: buildSystemPrompt(in.Schema)},
-		{Role: "user", Content: in.Account},
+		{Role: "system", Content: buildSystemPrompt(in.Schema, in.QuestionsRemaining)},
+	}
+	for _, m := range in.Messages {
+		switch m.Role {
+		case "agent":
+			messages = append(messages, chatMessage{Role: "assistant", Content: m.Content})
+		default: // "technician"
+			messages = append(messages, chatMessage{Role: "user", Content: m.Content})
+		}
 	}
 
 	result := RunResult{Log: log}
@@ -244,6 +270,7 @@ func (r *Runner) Run(ctx context.Context, in RunInput, persist persistFunc) (Run
 			result.Content = content
 			result.TotalTokens = log.TotalTokens()
 			result.Saved = false
+			// result.Filled is cumulative; leave whatever prior fills set.
 			return result, err
 		}
 
@@ -288,6 +315,50 @@ func (r *Runner) Run(ctx context.Context, in RunInput, persist persistFunc) (Run
 			return result, nil
 		}
 
+		// e2. ask_technician is intercepted here rather than dispatched through
+		// the registry. A VALID question pauses the turn: the loop stops without
+		// emitting save_draft (Req 2.2) and the handler persists any accumulated
+		// fills at turn end (task 6.2). An INVALID question (empty/whitespace,
+		// over 500 chars, or asked when no questions remain this turn) is
+		// rejected, logged, and the loop CONTINUES so the model can choose
+		// another action (Req 2.5, 4.5).
+		if call.Tool == "ask_technician" {
+			q := strings.TrimSpace(call.Question)
+			args := askArgs(call)
+
+			var detail string
+			switch {
+			case q == "":
+				detail = "question is empty or whitespace-only; ask a single question of 1 to 500 characters"
+			case len(q) > 500:
+				detail = "question exceeds 500 characters; ask a single question of 1 to 500 characters"
+			case in.QuestionsRemaining <= 0:
+				detail = "no questions remaining this report; flag any required fields you cannot fill, then save_draft"
+			}
+
+			if detail != "" {
+				// Reject: log it and feed the rejection back like any other tool
+				// result, then continue the loop (no pause).
+				rejected := toolResult{Ok: false, Detail: detail}
+				logTool(st, "ask_technician", args, rejected)
+				encoded, _ := json.Marshal(rejected)
+				messages = append(messages, chatMessage{Role: "user", Content: "TOOL RESULT: " + string(encoded)})
+				continue
+			}
+
+			// Valid question: pause the turn. Do NOT emit save_draft and do NOT
+			// persist here — the handler persists the accumulated fills at turn
+			// end (task 6.2). result.Filled reflects whether any fill happened.
+			log.Terminate("ask_technician")
+			result.TerminatedBy = "ask_technician"
+			result.AwaitingAnswer = true
+			result.Question = q
+			result.Content = *st.content
+			result.FlaggedFieldIDs = flaggedIDs(st.flagged)
+			result.Saved = false
+			return result, nil
+		}
+
 		// f. Any other tool: dispatch through the registry (the handler logs
 		// itself), then feed the tool result back as a message for the next
 		// prompt so the model sees the outcome of its call.
@@ -303,6 +374,12 @@ func (r *Runner) Run(ctx context.Context, in RunInput, persist persistFunc) (Run
 		// RESULT:" prefix keeps it unambiguous to the model that this user
 		// message is the outcome of its previous call.
 		toolRes := r.registry.dispatch(st, call)
+		if call.Tool == "fill_field" && toolRes.Ok {
+			// A successful fill means the turn produced content worth persisting
+			// even if it later pauses or hits the iteration cap (Req 5.x). Filled
+			// is cumulative: once true it stays true for the rest of the turn.
+			result.Filled = true
+		}
 		encoded, _ := json.Marshal(toolRes)
 		messages = append(messages, chatMessage{Role: "user", Content: "TOOL RESULT: " + string(encoded)})
 	}

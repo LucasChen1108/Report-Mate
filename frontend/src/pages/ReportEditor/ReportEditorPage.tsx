@@ -52,10 +52,9 @@ import {
   saveAndExportReport,
   saveReport,
 } from "../../api/reports";
-import type { AgentFillResponse } from "../../api/agent";
 import { colors, fontSize, radius, spacing } from "../../styles/tokens";
 import { A4Document, A4Page, ReportHeader } from "./A4Document";
-import { AgentAssistPanel } from "./AgentAssistPanel";
+import { ConversationPanel } from "./ConversationPanel";
 import { FieldRenderer } from "./FieldRenderer";
 import { PartsUsedSection } from "./PartsUsedSection";
 import { seedFixtures, sampleHvacContent } from "./fixtures";
@@ -266,7 +265,8 @@ export function ReportEditorPage({
   // agent flagged as unfillable so they know exactly what still needs them
   // (Req 3.2, 3.4). This is purely additive: the manual Save draft / Save and
   // Export flow is untouched (Req 9.5).
-  const handleAgentFilled = useCallback((response: AgentFillResponse) => {
+  const handleAgentResult = useCallback(
+    (response: { report: ReportRecord; flaggedFieldIds: string[] }) => {
     const filled = response.report;
     setContent(contentFromWire(filled.schemaSnapshot, filled.content));
     setCustomerName(filled.customerName ?? "");
@@ -277,7 +277,9 @@ export function ReportEditorPage({
     // A fresh draft from the agent has nothing saved yet; drop a stale
     // saved-at indicator without inventing a new status.
     setStatus((prev) => (prev.kind === "idle" ? prev : { kind: "idle" }));
-  }, []);
+    },
+    [],
+  );
 
   // Map any rejection from the report client to a status. Kept in one place so
   // the draft and export paths report failures identically — the one thing that
@@ -559,10 +561,10 @@ export function ReportEditorPage({
               fixture (dev) modes, gated the same way the Save actions are on
               `usingReport`. The panel is additive: it owns its own in-flight /
               error state and hands the finished draft back through
-              handleAgentFilled, so the manual fill path stays fully
-              independent of the agent (Req 9.5). */}
+              handleAgentResult, so the manual fill path stays fully
+              independent of the agent (Req 11.4). */}
           {usingReport && report && (
-            <AgentAssistPanel reportId={report.id} onFilled={handleAgentFilled} />
+            <ConversationPanel reportId={report.id} onCompleted={handleAgentResult} />
           )}
 
           {/* Customer — an editable header field, not a schema field. Jobs are

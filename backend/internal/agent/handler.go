@@ -34,18 +34,45 @@ type Handler struct {
 	client chatClient // nil when the gateway is unconfigured
 	jobs   JobHistoryProvider
 	parts  PartsCatalogProvider
+
+	// turnCap bounds the number of completed conversation turns a chat can
+	// carry before the agent refuses to run another turn; questionCap bounds the
+	// number of clarifying questions across a chat. Both are derived from config
+	// (task 7.1 wires cfg values in) and defended below so the handler is safe
+	// even if a caller passes a non-positive value.
+	turnCap     int
+	questionCap int
 }
+
+// defaultTurnCap / defaultQuestionCap are the handler-local fallbacks applied
+// when a non-positive cap is passed in. Config already resolves sane values
+// (task 1.1), so these are purely defensive — they keep the endpoint from
+// derailing (e.g. a zero turnCap would refuse every turn) if construction is
+// ever fed a bad value.
+const (
+	defaultTurnCap     = 6
+	defaultQuestionCap = 4
+)
 
 // NewHandler composes the agent handler over db, the (possibly nil) gateway
 // client, and the two context providers. When client is nil the endpoint
 // answers 503 without dialling out, so the manual fill path keeps working with
-// no gateway configured (Req 9.1).
-func NewHandler(db *sql.DB, client chatClient, jobs JobHistoryProvider, parts PartsCatalogProvider) *Handler {
+// no gateway configured (Req 9.1). turnCap/questionCap bound the conversation
+// endpoint; a non-positive value falls back to the package default.
+func NewHandler(db *sql.DB, client chatClient, jobs JobHistoryProvider, parts PartsCatalogProvider, turnCap, questionCap int) *Handler {
+	if turnCap <= 0 {
+		turnCap = defaultTurnCap
+	}
+	if questionCap <= 0 {
+		questionCap = defaultQuestionCap
+	}
 	return &Handler{
-		store:  reports.NewStore(db),
-		client: client,
-		jobs:   jobs,
-		parts:  parts,
+		store:       reports.NewStore(db),
+		client:      client,
+		jobs:        jobs,
+		parts:       parts,
+		turnCap:     turnCap,
+		questionCap: questionCap,
 	}
 }
 
@@ -59,12 +86,12 @@ func NewHandler(db *sql.DB, client chatClient, jobs JobHistoryProvider, parts Pa
 // used; otherwise the client is left nil (an interface holding no concrete
 // value, so h.client == nil is true) and the endpoint answers 503 while the
 // manual fill path keeps working (Req 9.1). The apiKey is never logged here.
-func NewHandlerFromConfig(db *sql.DB, gatewayURL, apiKey, model string, jobs JobHistoryProvider, parts PartsCatalogProvider) *Handler {
+func NewHandlerFromConfig(db *sql.DB, gatewayURL, apiKey, model string, jobs JobHistoryProvider, parts PartsCatalogProvider, turnCap, questionCap int) *Handler {
 	var client chatClient
 	if gatewayURL != "" && apiKey != "" {
 		client = newGatewayClient(gatewayURL, apiKey, model)
 	}
-	return NewHandler(db, client, jobs, parts)
+	return NewHandler(db, client, jobs, parts, turnCap, questionCap)
 }
 
 // RegisterRoutes mounts the agent route. The pattern is the FULL path even
@@ -75,6 +102,7 @@ func NewHandlerFromConfig(db *sql.DB, gatewayURL, apiKey, model string, jobs Job
 // with.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/reports/{id}/agent-fill", h.handleAgentFill)
+	mux.HandleFunc("POST /api/reports/{id}/agent-chat", h.handleAgentChat)
 }
 
 // agentFillRequest is the JSON body of POST /api/reports/{id}/agent-fill: the
@@ -94,22 +122,24 @@ type agentFillResponse struct {
 	TerminatedBy    string               `json:"terminatedBy"`
 }
 
-// handleAgentFill runs the agent against a draft. It is VALIDATION-FIRST:
-// nothing dials the gateway until every guard passes (Req 1.4, 1.6, 1.7), so an
-// unauthenticated caller, an unknown/foreign report, a non-draft report, or an
-// invalid account never spends a gateway credit.
+// loadOwnedDraft runs the guard ladder shared by handleAgentFill and
+// handleAgentChat and returns the loaded, owned, editable draft. It is
+// VALIDATION-FIRST and touches no gateway: every guard here answers before any
+// LLM call, so an unauthenticated caller, an unknown/foreign report, or a
+// non-draft report never spends a gateway credit.
 //
 // The guards, in order:
 //  1. Identity — 401 when unauthenticated (Req 1.6).
 //  2. Id shape / existence — 404 on a malformed or unknown id.
 //  3. Ownership — 403 when a technician does not own the report (Req 1.6).
 //  4. Status — 422 when the report is not a draft (Req 1.7).
-//  5. Account — 422 when empty/whitespace or longer than 10,000 chars (Req 1.4).
-//  6. Gateway configured — 503 when h.client is nil (Req 9.1).
 //
-// Only then does it run the loop and map the result. A run that does not reach
-// save_draft persisted nothing, so the draft is unchanged either way (Req 9.3).
-func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
+// On any failure it writes the response and returns ok=false; the caller must
+// return immediately. The per-endpoint input validation and the gateway-nil
+// 503 check are deliberately NOT here — each endpoint runs them itself, after
+// its own input validation, so a bad body is rejected before the gateway is
+// even considered.
+func (h *Handler) loadOwnedDraft(w http.ResponseWriter, r *http.Request) (reports.ReportRecord, bool) {
 	ctx := r.Context()
 
 	// 1. Identity: an unauthenticated request never falls back to a default
@@ -117,7 +147,7 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "authentication is required")
-		return
+		return reports.ReportRecord{}, false
 	}
 	role, _ := middleware.RoleFromContext(ctx)
 
@@ -127,12 +157,12 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !isUUID(id) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "report not found")
-		return
+		return reports.ReportRecord{}, false
 	}
 	rec, err := h.store.Get(ctx, id)
 	if err != nil {
 		writeStoreError(w, err)
-		return
+		return reports.ReportRecord{}, false
 	}
 
 	// 3. Ownership: a technician may only reach their own reports; any other
@@ -140,7 +170,7 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 	if role == technicianRole {
 		if rec.TechnicianID == nil || *rec.TechnicianID != userID {
 			httpx.WriteError(w, http.StatusForbidden, "authorization_error", "this report belongs to another technician")
-			return
+			return reports.ReportRecord{}, false
 		}
 	}
 
@@ -148,6 +178,37 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 	// (Req 1.7); no gateway call.
 	if rec.Status != reports.StatusDraft {
 		httpx.WriteError(w, http.StatusUnprocessableEntity, httpx.ValidationCode, "report is not editable")
+		return reports.ReportRecord{}, false
+	}
+
+	return rec, true
+}
+
+// handleAgentFill runs the agent against a draft. It is VALIDATION-FIRST:
+// nothing dials the gateway until every guard passes (Req 1.4, 1.6, 1.7), so an
+// unauthenticated caller, an unknown/foreign report, a non-draft report, or an
+// invalid account never spends a gateway credit.
+//
+// The guards, in order:
+//  1. Identity — 401 when unauthenticated (Req 1.6).       ┐
+//  2. Id shape / existence — 404 on a malformed/unknown id. │ loadOwnedDraft
+//  3. Ownership — 403 when a technician does not own it.    │ (shared with chat)
+//  4. Status — 422 when the report is not a draft (Req 1.7).┘
+//  5. Account — 422 when empty/whitespace or longer than 10,000 chars (Req 1.4).
+//  6. Gateway configured — 503 when h.client is nil (Req 9.1).
+//
+// Only then does it run the loop and map the result. A run that does not reach
+// save_draft persisted nothing, so the draft is unchanged either way (Req 9.3).
+func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Guards 1-4 (identity 401 → id/existence 404 → ownership 403 → status 422)
+	// are shared with handleAgentChat; loadOwnedDraft runs them and writes the
+	// error response itself when one fails. The gateway-nil 503 check stays
+	// here, AFTER account validation, so an invalid account is rejected before
+	// we ever look at whether the gateway is configured.
+	rec, ok := h.loadOwnedDraft(w, r)
+	if !ok {
 		return
 	}
 
@@ -187,9 +248,14 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 		Schema:   rec.SchemaSnapshot,
 		Content:  rec.Content,
 		JobID:    rec.JobID,
-		Account:  account,
-		Jobs:     h.jobs,
-		Parts:    h.parts,
+		// agent-fill is one-shot: the account is a single technician-role
+		// message and no questions are allowed (QuestionsRemaining: 0 makes the
+		// prompt tell the model not to ask). This keeps the one-shot path
+		// behaving exactly as before atop the generalized runner.
+		Messages:           []ConversationMessage{{Role: "technician", Content: account}},
+		QuestionsRemaining: 0,
+		Jobs:               h.jobs,
+		Parts:              h.parts,
 	}, persist)
 
 	// Record the run server-side for replay/debugging (Req 8.1, 8.2). The run
@@ -225,6 +291,171 @@ func (h *Handler) handleAgentFill(w http.ResponseWriter, r *http.Request) {
 		FlaggedFieldIDs: res.FlaggedFieldIDs,
 		TokenUsage:      res.TotalTokens,
 		TerminatedBy:    res.TerminatedBy,
+	})
+}
+
+// handleAgentChat runs ONE conversation turn from a client-carried transcript
+// (POST /api/reports/{id}/agent-chat). Like handleAgentFill it is
+// VALIDATION-FIRST: the shared guard ladder plus transcript validation and the
+// turn-cap check all answer before any gateway call, so an invalid request
+// never spends a gateway credit and never changes the draft (Req 1.6, 4.4,
+// 11.1).
+//
+// The flow:
+//  1. loadOwnedDraft — identity 401 → id 404 → ownership 403 → status 422.
+//  2. Decode agentChatRequest (DisallowUnknownFields) — 400 on failure.
+//  3. validateTranscript — 422, NO gateway call, NO draft change (Req 1.6, 9.1).
+//  4. Turn cap: turnsUsed >= turnCap → 200 terminatedBy "turn_cap", NO gateway
+//     call (Req 4.4).
+//  5. Gateway configured — 503 when h.client is nil (Req 11.5).
+//  6. Run one turn; on a pause/cap turn that produced fills, persist once
+//     (Req 5.2, 5.4); map runErr like agent-fill; reload; return the grown
+//     transcript and the turn's outcome (Req 1.3, 2.4, 8.1).
+func (h *Handler) handleAgentChat(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Guards 1-4, shared with handleAgentFill.
+	rec, ok := h.loadOwnedDraft(w, r)
+	if !ok {
+		return
+	}
+
+	// a. Decode the transcript. An unknown field or malformed body is a client
+	// error, never a gateway call.
+	var req agentChatRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "request body could not be decoded")
+		return
+	}
+
+	// b. Validate the transcript shape. On failure: 422, no gateway call, no
+	// draft change (Req 1.6, 9.1).
+	if err := validateTranscript(req.Messages); err != nil {
+		httpx.WriteValidationError(w, err.Error(), nil)
+		return
+	}
+
+	// c. Turn cap derived from the transcript. If this chat has already run its
+	// budgeted turns, refuse to run another one WITHOUT dialling the gateway
+	// (Req 4.4). Reload so the response still carries the current persisted
+	// draft; the transcript is returned unchanged.
+	turns := turnsUsed(req.Messages)
+	q := questionsUsed(req.Messages)
+	if turns >= h.turnCap {
+		report := rec
+		if reloaded, err := h.store.Get(ctx, rec.ID); err == nil {
+			report = reloaded
+		}
+		httpx.WriteJSON(w, http.StatusOK, agentChatResponse{
+			Messages:        req.Messages,
+			Report:          report,
+			FlaggedFieldIDs: []string{},
+			AwaitingAnswer:  false,
+			TerminatedBy:    "turn_cap",
+			TokenUsage:      0,
+			TurnsUsed:       turns,
+			QuestionsUsed:   q,
+		})
+		return
+	}
+
+	// d. Gateway unconfigured: the agent is unavailable but the manual fill path
+	// still works. Draft untouched (Req 11.5).
+	if h.client == nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "agent_unavailable", "the AI assistant is unavailable right now")
+		return
+	}
+
+	// e. Questions remaining this turn, floored at zero. QuestionsRemaining <= 0
+	// makes the prompt tell the model not to ask and the runner reject any
+	// ask_technician (Req 4.5).
+	questionsRemaining := h.questionCap - q
+	if questionsRemaining < 0 {
+		questionsRemaining = 0
+	}
+
+	// f. Run one turn. persist is the same save_draft closure agent-fill uses;
+	// the runner calls it inline on save_draft, and we reuse it below for the
+	// pause/cap-with-fills case.
+	persist := newPersistFunc(h.store, rec.ID, rec.SchemaSnapshot, rec.Content.FilledBy, rec.CustomerName)
+	runner := NewRunner(h.client)
+	res, runErr := runner.Run(ctx, RunInput{
+		ReportID:           rec.ID,
+		Schema:             rec.SchemaSnapshot,
+		Content:            rec.Content,
+		JobID:              rec.JobID,
+		Messages:           req.Messages,
+		QuestionsRemaining: questionsRemaining,
+		Jobs:               h.jobs,
+		Parts:              h.parts,
+	}, persist)
+
+	// g. Record the run server-side for replay/debugging (Req 8.1). Never the
+	// gateway key.
+	log.Printf("agent: chat report=%s terminatedBy=%s tokens=%d saved=%t awaiting=%t",
+		rec.ID, res.TerminatedBy, res.TotalTokens, res.Saved, res.AwaitingAnswer)
+
+	// h. Turn-end persist for a pause or per-turn iteration cap that produced
+	// fills. save_draft already persisted inline in the runner; this handles the
+	// case where the turn paused (ask_technician) or hit the iteration cap with
+	// content worth keeping (Req 5.2, 5.4). A validation failure maps to 422
+	// naming the offending element, prior content intact; any other write error
+	// is a 503.
+	if runErr == nil && !res.Saved && res.Filled &&
+		(res.TerminatedBy == "ask_technician" || res.TerminatedBy == "iteration_cap") {
+		if err := persist(ctx, res.Content); err != nil {
+			var verr *reports.ValidationError
+			if errors.As(err, &verr) {
+				httpx.WriteValidationError(w, verr.Message, elementIDPtr(verr.Element))
+				return
+			}
+			httpx.WriteError(w, http.StatusServiceUnavailable, "agent_unavailable", "the AI assistant is unavailable right now")
+			return
+		}
+	}
+
+	// i. Map a run error exactly like agent-fill: a persist-time validation
+	// error → 422 naming the element (draft unchanged); anything else is a
+	// gateway/timeout failure → 503 so the technician falls back to the manual
+	// path (Req 11.1, 11.2).
+	if runErr != nil {
+		var verr *reports.ValidationError
+		if errors.As(runErr, &verr) {
+			httpx.WriteValidationError(w, verr.Message, elementIDPtr(verr.Element))
+			return
+		}
+		httpx.WriteError(w, http.StatusServiceUnavailable, "agent_unavailable", "the AI assistant is unavailable right now")
+		return
+	}
+
+	// j. Grow the transcript. On a pause we append the agent's question so the
+	// client re-sends it next turn and can render it as the last agent message.
+	// On a completed/terminated non-pause turn nothing is appended — the
+	// transcript ends at the technician's last message, which is fine.
+	grown := req.Messages
+	if res.AwaitingAnswer {
+		grown = append(grown, ConversationMessage{Role: "agent", Content: res.Question})
+	}
+
+	// k. Reload so the response carries the persisted content (Saved inline or a
+	// turn-end persist above). On reload error fall back to the pre-run record.
+	report := rec
+	if reloaded, err := h.store.Get(ctx, rec.ID); err == nil {
+		report = reloaded
+	}
+
+	// l. Return the turn outcome and the transcript-derived usage counts.
+	httpx.WriteJSON(w, http.StatusOK, agentChatResponse{
+		Messages:        grown,
+		Report:          report,
+		FlaggedFieldIDs: res.FlaggedFieldIDs,
+		AwaitingAnswer:  res.AwaitingAnswer,
+		TerminatedBy:    res.TerminatedBy,
+		TokenUsage:      res.TotalTokens,
+		TurnsUsed:       turnsUsed(grown),
+		QuestionsUsed:   questionsUsed(grown),
 	})
 }
 

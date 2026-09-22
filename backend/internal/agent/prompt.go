@@ -9,14 +9,21 @@ import (
 
 // buildSystemPrompt renders the deterministic system message that governs one
 // agent run. It describes the agent's job, the manual JSON tool-call contract,
-// the six tools and their exact JSON shapes, and embeds the draft's template
+// the seven tools and their exact JSON shapes, and embeds the draft's template
 // schema (field ids, labels, types, required flags, and options for
 // select/checklist) so the model knows exactly which blanks it may fill.
 //
-// The prompt is built purely from the schema so a given schema always yields
-// the same text. It is the system half of the transcript; the runner supplies
-// the technician's free-text account as the user message.
-func buildSystemPrompt(schema templates.TemplateSchema) string {
+// questionsRemaining is the number of ask_technician questions the agent may
+// still emit this turn (questionCap - questionsUsed). When it is positive the
+// prompt states the remaining budget and describes the ask_technician tool;
+// when it is zero or negative the prompt instructs the model not to ask further
+// questions and to flag any remaining required fields before saving.
+//
+// The prompt is built purely from the schema and the remaining question budget,
+// so the same inputs always yield the same text. It is the system half of the
+// transcript; the runner supplies the conversation transcript as user/assistant
+// messages.
+func buildSystemPrompt(schema templates.TemplateSchema, questionsRemaining int) string {
 	var b strings.Builder
 
 	b.WriteString("You are the Report Mate drafting agent. Your job is to fill in the blanks of a\n")
@@ -49,9 +56,25 @@ func buildSystemPrompt(schema templates.TemplateSchema) string {
 	b.WriteString("    and an array of strings for checklist (each drawn from the field's options).\n")
 	b.WriteString("- {\"tool\":\"flag_missing_field\",\"field_id\":\"...\"}\n")
 	b.WriteString("    Marks a required field you cannot confidently fill. Writes no value.\n")
+	if questionsRemaining > 0 {
+		b.WriteString("- {\"tool\":\"ask_technician\",\"question\":\"...\"}\n")
+		b.WriteString("    Ask the technician ONE short question (<=500 chars) for information you need\n")
+		b.WriteString("    to fill a field and cannot get from the account, job history, or parts\n")
+		b.WriteString("    catalog. Emitting this pauses the draft and waits for their answer. Prefer\n")
+		b.WriteString("    asking over flagging a required field. Frame every question as a request for\n")
+		b.WriteString("    information to fill or flag a specific template field.\n")
+	}
 	b.WriteString("- {\"tool\":\"save_draft\"}\n")
 	b.WriteString("    Emit this once you have filled everything you can and flagged the rest. It\n")
 	b.WriteString("    persists the draft for the technician's review and finishes the run.\n\n")
+
+	if questionsRemaining > 0 {
+		fmt.Fprintf(&b, "Question budget: you may ask the technician at most %d more question(s) this turn.\n\n", questionsRemaining)
+	} else {
+		b.WriteString("You have used all your questions for this report. Do NOT call ask_technician.\n")
+		b.WriteString("Flag any required field you still cannot fill with flag_missing_field, then\n")
+		b.WriteString("emit save_draft.\n\n")
+	}
 
 	b.WriteString("Template schema (these are the only fields you may fill or flag):\n")
 	writeSchema(&b, schema)
