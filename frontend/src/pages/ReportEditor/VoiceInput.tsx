@@ -90,6 +90,9 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const finalTextRef = useRef<string>("");
+  // The transcript box scrolls to its bottom on every update so the most recent
+  // words stay in view (see the effect below).
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   // Web Audio graph for the waveform.
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -127,6 +130,14 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
 
   // Ensure teardown on unmount.
   useEffect(() => cleanup, [cleanup]);
+
+  // Keep the transcript scrolled to its bottom so the most recent words are
+  // always visible as the speaker talks (the box shows the last ~2 lines and
+  // rolls forward rather than truncating the start).
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [interim]);
 
   // Drive the waveform from the analyser's time-domain data. The loop keeps
   // running while recording even before the analyser is ready — it just pushes a
@@ -218,7 +229,12 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
           interimText += text;
         }
       }
-      setInterim(interimText);
+      // Display the running transcript (finalized + current interim) so the
+      // speaker sees the last few words they said, not just the pending chunk.
+      // The box is fixed-height and auto-scrolls to the bottom, so as more is
+      // spoken the view rolls to keep the most recent words visible.
+      const running = (finalTextRef.current + interimText).replace(/\s+/g, " ").trimStart();
+      setInterim(running);
     };
     recognition.onerror = (ev) => {
       if (ev.error && ev.error !== "aborted" && ev.error !== "no-speech") {
@@ -296,11 +312,13 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         display: "flex",
         alignItems: "center",
         gap: spacing.sm,
-        // Fill the composer row and forbid internal wrapping, so a long interim
-        // transcript truncates within the overlay rather than shoving the mic
-        // onto the next line. minWidth:0 lets the overlay child actually shrink.
-        flex: 1,
+        // Hug content (so an idle/empty mic does not stretch the row) while
+        // still allowing growth when recording: the overlay child decides
+        // whether to grow. minWidth:0 lets the overlay shrink so its transcript
+        // wraps rather than shoving the mic to the next line; nowrap keeps the
+        // mic on the same row as the overlay.
         minWidth: 0,
+        maxWidth: "100%",
         flexWrap: "nowrap",
       }}
     >
@@ -342,7 +360,10 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         {recording ? <StopIcon /> : <MicIcon />}
       </button>
 
-      {/* Recording overlay: live waveform + dimmed interim ghost transcript. */}
+      {/* Recording overlay: live waveform + rolling recent-words transcript.
+          When nothing has been transcribed yet the overlay hugs its content
+          (waveform + short hint) instead of stretching the whole row; once words
+          arrive the transcript region grows to fill the available width. */}
       {recording && (
         <div
           data-testid="voice-input-overlay"
@@ -350,8 +371,11 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
             display: "flex",
             alignItems: "center",
             gap: spacing.md,
-            flex: 1,
+            // Grow to fill only when there is transcript to show; empty stays
+            // compact so the box does not span the full outer width.
+            flex: interim ? 1 : "0 0 auto",
             minWidth: 0,
+            maxWidth: "100%",
             padding: `${spacing.xs}px ${spacing.md}px`,
             borderRadius: radius.md,
             border: `1px solid ${colors.borderSubtle}`,
@@ -359,22 +383,42 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
           }}
         >
           <Waveform levels={levels} />
-          <span
-            data-testid="voice-input-interim"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontSize: fontSize.sm,
-              fontStyle: "italic",
-              color: colors.textMuted,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {/* MIC TEXT HERE */}
-            {interim || ""}  
-          </span>
+          {interim ? (
+            // Fixed two-line-tall box, wrapping normally and auto-scrolled to the
+            // bottom (see the effect), so the speaker always sees the most recent
+            // words; older words scroll out of view rather than the newest being
+            // clipped. minWidth:0 lets it shrink so wrapping (not overflow) kicks in.
+            <div
+              ref={transcriptRef}
+              data-testid="voice-input-interim"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                maxHeight: `${Math.round(fontSize.sm * 1.4 * 2)}px`, // ~2 lines
+                overflow: "hidden",
+                fontSize: fontSize.sm,
+                lineHeight: 1.4,
+                fontStyle: "italic",
+                color: colors.textMuted,
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {interim}
+            </div>
+          ) : (
+            <span
+              data-testid="voice-input-interim"
+              style={{
+                fontSize: fontSize.sm,
+                fontStyle: "italic",
+                color: colors.textMuted,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Listening…
+            </span>
+          )}
         </div>
       )}
 
