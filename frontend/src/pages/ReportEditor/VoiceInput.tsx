@@ -284,15 +284,15 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
           background: recording ? colors.danger : colors.surface,
           color: recording ? colors.onDanger : colors.primary,
           cursor: disabled ? "default" : "pointer",
-          fontSize: fontSize.lg,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           animation: recording ? "rm-pulse 1.2s ease-in-out infinite" : undefined,
         }}
       >
-        {/* Mic glyph; a square when recording to read as "stop". */}
-        {recording ? "■" : "🎤"}
+        {/* Modern inline icons: a mic (capsule + stand) idle, a rounded stop
+            square while recording. Both inherit the button's currentColor. */}
+        {recording ? <StopIcon /> : <MicIcon />}
       </button>
 
       {/* Recording overlay: live waveform + dimmed interim ghost transcript. */}
@@ -347,6 +347,50 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         50% { box-shadow: 0 0 0 6px rgba(160, 27, 14, 0); }
       }`}</style>
     </div>
+  );
+}
+
+// MicIcon is a modern microphone glyph: a rounded capsule mic head, a curved
+// stand cradling it, and a short base stem. Drawn on a 24x24 grid, inheriting
+// the button's currentColor for both stroke and the capsule fill.
+function MicIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {/* Mic capsule. */}
+      <rect x="9" y="2" width="6" height="11" rx="3" fill="currentColor" stroke="none" />
+      {/* Cradle: the arc that hugs the capsule. */}
+      <path d="M5 10.5a7 7 0 0 0 14 0" />
+      {/* Stand + base. */}
+      <line x1="12" y1="17.5" x2="12" y2="21" />
+      <line x1="8.5" y1="21" x2="15.5" y2="21" />
+    </svg>
+  );
+}
+
+// StopIcon is a rounded stop square, the modern "tap to stop" affordance shown
+// while recording. It inherits the button's currentColor as a solid fill.
+function StopIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="6" y="6" width="12" height="12" rx="3" fill="currentColor" />
+    </svg>
   );
 }
 
