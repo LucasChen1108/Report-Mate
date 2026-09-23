@@ -24,3 +24,8 @@ dist-ssr
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+*.local
