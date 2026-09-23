@@ -32,6 +32,8 @@ import (
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/db"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/jobs"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/parts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
@@ -104,16 +106,19 @@ func run() error {
 	// which case the agent-fill endpoint answers 503 and the manual fill path
 	// keeps working. The chatClient interface is unexported by the agent
 	// package, so this file hands the raw URL/key/model to
-	// NewHandlerFromConfig and lets that package own the nil decision. The two
-	// context providers are the empty defaults until the jobs table and a parts
-	// catalog exist.
+	// NewHandlerFromConfig and lets that package own the nil decision.
+	//
+	// The two context providers now back the get_job_history and
+	// get_parts_catalog tools with real data (the jobs seed and the
+	// parts_catalog table), replacing the earlier Empty* defaults. Both satisfy
+	// the agent's provider interfaces and are read-only over the pool.
 	agentHandler := agent.NewHandlerFromConfig(
 		pool,
 		cfg.LLMGatewayURL,
 		cfg.LLMGatewayAPIKey,
 		cfg.LLMModel,
-		agent.EmptyJobHistory{},
-		agent.EmptyPartsCatalog{},
+		jobs.NewHistory(pool),
+		parts.NewCatalog(pool),
 		cfg.ConversationTurnCap,
 		cfg.ConversationQuestionCap,
 	)
