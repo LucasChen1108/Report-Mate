@@ -131,12 +131,12 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
   // Ensure teardown on unmount.
   useEffect(() => cleanup, [cleanup]);
 
-  // Keep the transcript scrolled to its bottom so the most recent words are
-  // always visible as the speaker talks (the box shows the last ~2 lines and
-  // rolls forward rather than truncating the start).
+  // Keep the single-line transcript scrolled to its right edge so the most
+  // recent words are always visible as the speaker talks; earlier words roll
+  // off the left rather than the newest being clipped.
   useEffect(() => {
     const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) el.scrollLeft = el.scrollWidth;
   }, [interim]);
 
   // Drive the waveform from the analyser's time-domain data. The loop keeps
@@ -384,24 +384,24 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         >
           <Waveform levels={levels} />
           {interim ? (
-            // Fixed two-line-tall box, wrapping normally and auto-scrolled to the
-            // bottom (see the effect), so the speaker always sees the most recent
-            // words; older words scroll out of view rather than the newest being
-            // clipped. minWidth:0 lets it shrink so wrapping (not overflow) kicks in.
+            // A single-line window showing only the MOST RECENT line: the text
+            // stays on one line (nowrap) and the box is auto-scrolled to its
+            // right edge (see the effect), so the newest words are always visible
+            // while earlier words roll off the left. minWidth:0 lets it shrink so
+            // it clips to one line rather than pushing the mic off the row.
             <div
               ref={transcriptRef}
               data-testid="voice-input-interim"
               style={{
                 flex: 1,
                 minWidth: 0,
-                maxHeight: `${Math.round(fontSize.sm * 1.4 * 2)}px`, // ~2 lines
-                overflow: "hidden",
+                overflowX: "hidden",
+                overflowY: "hidden",
                 fontSize: fontSize.sm,
                 lineHeight: 1.4,
                 fontStyle: "italic",
                 color: colors.textMuted,
-                whiteSpace: "pre-wrap",
-                overflowWrap: "anywhere",
+                whiteSpace: "nowrap",
               }}
             >
               {interim}
