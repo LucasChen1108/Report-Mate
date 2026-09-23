@@ -128,46 +128,69 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
   // Ensure teardown on unmount.
   useEffect(() => cleanup, [cleanup]);
 
-  // Drive the waveform from the analyser's time-domain data.
+  // Drive the waveform from the analyser's time-domain data. The loop keeps
+  // running while recording even before the analyser is ready — it just pushes a
+  // 0 level in that brief window — so the bar strip is live and scrolling from
+  // the moment the mic is clicked, then reacts to real amplitude the instant the
+  // audio graph comes up. It reschedules itself; commitAndReset/cleanup cancel it.
   const tick = useCallback(() => {
     const analyser = analyserRef.current;
-    if (!analyser) return;
-    const buf = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(buf);
-    // RMS amplitude around the 128 midpoint, normalized to ~0..1.
-    let sumSq = 0;
-    for (let i = 0; i < buf.length; i++) {
-      const v = (buf[i] - 128) / 128;
-      sumSq += v * v;
+    let level = 0;
+    if (analyser) {
+      const buf = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(buf);
+      // RMS amplitude around the 128 midpoint, normalized to ~0..1.
+      let sumSq = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sumSq += v * v;
+      }
+      const rms = Math.sqrt(sumSq / buf.length);
+      level = Math.min(1, rms * 3); // scale so normal speech fills the bar
     }
-    const rms = Math.sqrt(sumSq / buf.length);
-    const level = Math.min(1, rms * 3); // scale so normal speech fills the bar
     setLevels((prev) => [...prev.slice(1), level]);
     rafRef.current = requestAnimationFrame(tick);
   }, []);
 
-  const startWaveform = useCallback(async () => {
+  // ensureAudioGraph acquires the mic stream + AudioContext + analyser ONCE and
+  // keeps them warm for the rest of the session. The first recording still pays
+  // the one-time cost of the permission handshake / device open, but every
+  // subsequent start reuses the live graph, so the bars react instantly instead
+  // of waiting on a fresh getUserMedia each time. It is idempotent: if the graph
+  // already exists it just resumes a suspended context and returns.
+  const ensureAudioGraph = useCallback(async () => {
+    // Already warm — just make sure the context is running (browsers may
+    // auto-suspend it) and reuse it.
+    if (analyserRef.current && audioCtxRef.current) {
+      if (audioCtxRef.current.state === "suspended") {
+        await audioCtxRef.current.resume().catch(() => undefined);
+      }
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream =
+        streamRef.current ?? (await navigator.mediaDevices.getUserMedia({ audio: true }));
       streamRef.current = stream;
       const AudioCtx =
         window.AudioContext ??
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return; // no Web Audio — recognition still works, just no bars
-      const ctx = new AudioCtx();
+      const ctx = audioCtxRef.current ?? new AudioCtx();
       audioCtxRef.current = ctx;
+      if (ctx.state === "suspended") {
+        await ctx.resume().catch(() => undefined);
+      }
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       source.connect(analyser);
       analyserRef.current = analyser;
-      rafRef.current = requestAnimationFrame(tick);
     } catch {
       // Mic permission denied or unavailable: recognition may still work in
       // some browsers, but typically both fail together. Surface a gentle note.
       setError("Microphone unavailable. You can type instead.");
     }
-  }, [tick]);
+  }, []);
 
   const start = useCallback(() => {
     if (disabled || recording) return;
@@ -215,9 +238,18 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
       // start() throws if already started; ignore.
     }
     setRecording(true);
-    void startWaveform();
+
+    // Start the animation loop RIGHT NOW so the bars are live from the click.
+    // tick() no-ops until the analyser exists, so warming the audio graph in the
+    // background (below) lets the bars begin moving the instant the mic is ready
+    // — no wait on teardown/re-setup, and instant on every recording after the
+    // first (the graph is kept warm).
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    void ensureAudioGraph();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, recording, startWaveform]);
+  }, [disabled, recording, tick, ensureAudioGraph]);
 
   // Commit the finalized transcript and reset recording state. Safe to call
   // more than once — the ref is cleared so a second call commits nothing.
@@ -226,19 +258,19 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
     finalTextRef.current = "";
     setRecording(false);
     setInterim("");
+    setLevels(new Array(WAVE_BARS).fill(0));
+    // Stop the animation loop, but DELIBERATELY keep the audio graph warm (the
+    // mic stream and AudioContext stay open) so the next recording starts
+    // instantly instead of paying the getUserMedia cost again. The graph is
+    // fully released on unmount by cleanup(). To be a good citizen while idle,
+    // suspend the context so it is not processing audio between recordings.
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state === "running") {
+      void audioCtxRef.current.suspend().catch(() => undefined);
     }
-    if (audioCtxRef.current) {
-      void audioCtxRef.current.close().catch(() => undefined);
-      audioCtxRef.current = null;
-    }
-    analyserRef.current = null;
     if (text) onCommit(text);
   }, [onCommit]);
 
@@ -325,7 +357,8 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
               textOverflow: "ellipsis",
             }}
           >
-            {interim || "Listening… tap the mic again to add"}
+            {/* MIC TEXT HERE */}
+            {interim || ""}  
           </span>
         </div>
       )}
