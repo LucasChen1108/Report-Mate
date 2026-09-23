@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
 
@@ -19,11 +21,18 @@ import (
 // when it is zero or negative the prompt instructs the model not to ask further
 // questions and to flag any remaining required fields before saving.
 //
-// The prompt is built purely from the schema and the remaining question budget,
-// so the same inputs always yield the same text. It is the system half of the
-// transcript; the runner supplies the conversation transcript as user/assistant
-// messages.
-func buildSystemPrompt(schema templates.TemplateSchema, questionsRemaining int) string {
+// content is the draft's CURRENT contents (values keyed by field id). It is
+// embedded alongside the schema so the model sees what each field already holds
+// on re-entry — without it, asking the agent to "rewrite the arrival notes
+// longer" fails because the model has no idea what the arrival notes currently
+// say. Empty/unfilled fields are shown as "(empty)" so a fresh draft reads the
+// same way it did before, and a re-entered one carries its prior work.
+//
+// The prompt is built purely from the schema, the current content, and the
+// remaining question budget, so the same inputs always yield the same text. It
+// is the system half of the transcript; the runner supplies the conversation
+// transcript as user/assistant messages.
+func buildSystemPrompt(schema templates.TemplateSchema, content reports.ReportContent, questionsRemaining int) string {
 	var b strings.Builder
 
 	b.WriteString("You are the Report Mate drafting agent. Your job is to fill in the blanks of a\n")
@@ -76,8 +85,12 @@ func buildSystemPrompt(schema templates.TemplateSchema, questionsRemaining int) 
 		b.WriteString("emit save_draft.\n\n")
 	}
 
-	b.WriteString("Template schema (these are the only fields you may fill or flag):\n")
-	writeSchema(&b, schema)
+	b.WriteString("Template schema and the draft's current contents (these are the only fields\n")
+	b.WriteString("you may fill or flag). \"current\" shows what each field already holds — an\n")
+	b.WriteString("empty field shows (empty). When you fill_field an already-filled field, your\n")
+	b.WriteString("value REPLACES the current one, so use the current contents when a request is\n")
+	b.WriteString("to revise or extend existing text (e.g. \"make the arrival notes longer\"):\n")
+	writeSchema(&b, schema, content)
 
 	b.WriteString("\nWhen you have filled every field you can and flagged the required ones you\n")
 	b.WriteString("cannot, emit {\"tool\":\"save_draft\"} to finish.\n")
@@ -87,8 +100,11 @@ func buildSystemPrompt(schema templates.TemplateSchema, questionsRemaining int) 
 
 // writeSchema appends a human-readable, deterministic listing of the schema's
 // sections and fields to b, one field per line with its id, label, type,
-// required flag, and (for select/checklist) allowed options.
-func writeSchema(b *strings.Builder, schema templates.TemplateSchema) {
+// required flag, (for select/checklist) allowed options, and the field's
+// CURRENT value from content (rendered by currentValueText). Values are keyed
+// by field id, matching content.Values, so the model sees exactly what each
+// blank already holds on re-entry.
+func writeSchema(b *strings.Builder, schema templates.TemplateSchema, content reports.ReportContent) {
 	if len(schema.Sections) == 0 {
 		b.WriteString("(the template defines no sections)\n")
 		return
@@ -113,7 +129,80 @@ func writeSchema(b *strings.Builder, schema templates.TemplateSchema) {
 			if field.Type == templates.FieldPhoto || field.Type == templates.FieldSignature {
 				b.WriteString(" [human-captured: do not fill, flag if required]")
 			}
+			fmt.Fprintf(b, " current=%s", currentValueText(field, content.Values[field.ID]))
 			b.WriteString("\n")
 		}
 	}
+}
+
+// currentValueText renders a field's current stored value for the prompt in a
+// compact, model-friendly form. It never fails: an empty/null/missing value, or
+// one whose stored JSON does not match the field's declared shape (possible for
+// legacy content), degrades to "(empty)" or a best-effort raw rendering rather
+// than erroring. It intentionally does NOT re-validate — validation is
+// ValidateContent's job on write; here we only describe what is there.
+//
+//   - text/number/select: the scalar, quoted.
+//   - checklist: the chosen options as ["a", "b"].
+//   - photo: the caption if present (the image bytes are irrelevant to the model
+//     and never embedded), else a marker that a photo is attached or empty.
+//   - signature: only whether it is signed (the model must never fill it).
+func currentValueText(field templates.Field, raw json.RawMessage) string {
+	if isEmptyRaw(raw) {
+		return "(empty)"
+	}
+
+	switch field.Type {
+	case templates.FieldText, templates.FieldSelect:
+		var s string
+		if err := json.Unmarshal(raw, &s); err == nil {
+			if strings.TrimSpace(s) == "" {
+				return "(empty)"
+			}
+			return fmt.Sprintf("%q", s)
+		}
+	case templates.FieldNumber:
+		// Numbers may be stored as a JSON number or a string (the renderer keeps
+		// in-progress numbers as strings); show either verbatim.
+		return strings.TrimSpace(string(raw))
+	case templates.FieldChecklist:
+		var items []string
+		if err := json.Unmarshal(raw, &items); err == nil {
+			if len(items) == 0 {
+				return "(empty)"
+			}
+			quoted := make([]string, len(items))
+			for i, it := range items {
+				quoted[i] = fmt.Sprintf("%q", it)
+			}
+			return "[" + strings.Join(quoted, ", ") + "]"
+		}
+	case templates.FieldPhoto:
+		var pv struct {
+			DataURL *string `json:"dataUrl"`
+			Caption string  `json:"caption"`
+		}
+		if err := json.Unmarshal(raw, &pv); err == nil {
+			switch {
+			case strings.TrimSpace(pv.Caption) != "":
+				return fmt.Sprintf("(photo attached, caption %q)", pv.Caption)
+			case pv.DataURL != nil:
+				return "(photo attached)"
+			default:
+				return "(empty)"
+			}
+		}
+	case templates.FieldSignature:
+		return "(signed)"
+	}
+
+	// Unknown/mismatched shape: show the raw JSON compactly rather than lying.
+	return strings.TrimSpace(string(raw))
+}
+
+// isEmptyRaw reports whether a stored value should be treated as unfilled: no
+// bytes, or the JSON literal null. Mirrors reports.isJSONNull, kept local so the
+// prompt renderer does not depend on an unexported reports helper.
+func isEmptyRaw(raw json.RawMessage) bool {
+	return len(raw) == 0 || strings.TrimSpace(string(raw)) == "null"
 }

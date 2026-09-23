@@ -241,7 +241,7 @@ func (r *Runner) Run(ctx context.Context, in RunInput, persist persistFunc) (Run
 	// prior questions and the technician's answers. The loop appends the
 	// assistant reply and each tool result as it goes.
 	messages := []chatMessage{
-		{Role: "system", Content: buildSystemPrompt(in.Schema, in.QuestionsRemaining)},
+		{Role: "system", Content: buildSystemPrompt(in.Schema, in.Content, in.QuestionsRemaining)},
 	}
 	for _, m := range in.Messages {
 		switch m.Role {

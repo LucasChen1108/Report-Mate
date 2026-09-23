@@ -174,14 +174,41 @@ func (h *Handler) loadOwnedDraft(w http.ResponseWriter, r *http.Request) (report
 		}
 	}
 
-	// 4. Only a draft is editable. A submitted/exported report is fixed
-	// (Req 1.7); no gateway call.
+	// 4. Only a draft is editable. A submitted/exported report is a finalized
+	// document the technician signed off on (product: "the human stays the
+	// author of record"), so the agent never revises one in place (Req 1.7); no
+	// gateway call.
+	//
+	// This MUST go through WriteValidationError, not WriteError. Both return
+	// 422, but WriteError omits the `elementId` key, which makes the frontend's
+	// isValidationErrorBody guard (api/client.ts) reject the body and fall back
+	// to a hardcoded "The template failed validation." — the misleading message
+	// this endpoint was surfacing. WriteValidationError includes elementId:null,
+	// so the frontend uses the real message below. The message is also made
+	// status-specific so an exported vs submitted report reads clearly rather
+	// than looking like a content-validation failure.
 	if rec.Status != reports.StatusDraft {
-		httpx.WriteError(w, http.StatusUnprocessableEntity, httpx.ValidationCode, "report is not editable")
+		httpx.WriteValidationError(w, notEditableMessage(rec.Status), nil)
 		return reports.ReportRecord{}, false
 	}
 
 	return rec, true
+}
+
+// notEditableMessage returns a clear, status-specific reason an agent run was
+// refused on a non-draft report, so the technician sees why the report is
+// locked rather than a generic "validation failed". An exported report has been
+// finalized/exported as a document; a submitted one is awaiting/completed review.
+// Any other non-draft status falls back to a plain, accurate statement.
+func notEditableMessage(status string) string {
+	switch status {
+	case reports.StatusExported:
+		return "This report has already been exported and can no longer be edited by the assistant. Duplicate it to a new draft to make changes."
+	case reports.StatusSubmitted:
+		return "This report has been submitted and can no longer be edited by the assistant."
+	default:
+		return "This report is no longer a draft and can no longer be edited by the assistant."
+	}
 }
 
 // handleAgentFill runs the agent against a draft. It is VALIDATION-FIRST:
