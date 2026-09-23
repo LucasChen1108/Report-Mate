@@ -312,11 +312,11 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         display: "flex",
         alignItems: "center",
         gap: spacing.sm,
-        // Hug content (so an idle/empty mic does not stretch the row) while
-        // still allowing growth when recording: the overlay child decides
-        // whether to grow. minWidth:0 lets the overlay shrink so its transcript
-        // wraps rather than shoving the mic to the next line; nowrap keeps the
-        // mic on the same row as the overlay.
+        // Fill the composer row so the overlay's maxWidth:75% resolves against a
+        // definite width. minWidth:0 lets the overlay shrink; nowrap keeps the
+        // mic on the same row as the overlay (the overlay's 75% cap leaves room
+        // for the mic so the row never wraps).
+        flex: 1,
         minWidth: 0,
         maxWidth: "100%",
         flexWrap: "nowrap",
@@ -375,7 +375,10 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
             // compact so the box does not span the full outer width.
             flex: interim ? 1 : "0 0 auto",
             minWidth: 0,
-            maxWidth: "100%",
+            // Cap the overlay at 75% of the parent width so the mic always has
+            // room beside it and the row never wraps to a second line; the
+            // single-line transcript rolls within this width instead.
+            maxWidth: "75%",
             padding: `${spacing.xs}px ${spacing.md}px`,
             borderRadius: radius.md,
             border: `1px solid ${colors.borderSubtle}`,
