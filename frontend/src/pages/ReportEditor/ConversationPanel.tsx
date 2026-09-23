@@ -34,6 +34,7 @@ import { agentChat } from "../../api/agent";
 import type { AgentChatResponse, ConversationMessage } from "../../api/agent";
 import { ApiError, ApiValidationError } from "../../api/client";
 import { colors, fontSize, radius, spacing } from "../../styles/tokens";
+import { VoiceInput } from "./VoiceInput";
 
 // Conversation caps, mirroring the backend defaults (Req 4.1, 4.2). Shipped as
 // constants here; a config echo could replace them later without touching the
@@ -313,6 +314,21 @@ export function ConversationPanel({ reportId, onCompleted }: ConversationPanelPr
         >
           {sending ? "Working…" : "Send"}
         </button>
+
+        {/* Voice input: dictate the account/answer. It self-hides when the
+            browser has no speech recognition, so typing always works. The
+            finalized transcript is APPENDED to the input, mixing with any typed
+            text; a stale error is cleared on new voice input too. */}
+        <VoiceInput
+          disabled={sending || capReached}
+          onCommit={(transcript) => {
+            setInput((prev) => {
+              const sep = prev.trim().length > 0 ? (prev.endsWith(" ") ? "" : " ") : "";
+              return prev + sep + transcript;
+            });
+            setError((prev) => (prev === null ? prev : null));
+          }}
+        />
 
         {sending && (
           <span
