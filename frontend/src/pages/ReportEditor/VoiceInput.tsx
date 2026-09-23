@@ -266,20 +266,14 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         aria-pressed={recording}
         aria-label={recording ? "Stop recording" : "Record voice input"}
         disabled={disabled}
-        // Press-and-hold on pointer devices; also works as tap-to-toggle since
-        // pointerup after a quick tap stops it. Keyboard users get click-toggle.
-        onPointerDown={(e) => {
-          e.preventDefault();
-          start();
-        }}
-        onPointerUp={(e) => {
-          e.preventDefault();
-          if (recording) stop();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            recording ? stop() : start();
+        // Toggle: one click starts recording, the next click stops and commits.
+        // A single handler covers mouse, touch, and keyboard (Enter/Space fire
+        // click), so there is no separate pointer/keydown wiring to keep in sync.
+        onClick={() => {
+          if (recording) {
+            stop();
+          } else {
+            start();
           }
         }}
         style={{
@@ -331,7 +325,7 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
               textOverflow: "ellipsis",
             }}
           >
-            {interim || "Listening… release to add"}
+            {interim || "Listening… tap the mic again to add"}
           </span>
         </div>
       )}
