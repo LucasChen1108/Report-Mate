@@ -291,7 +291,19 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
   if (!supported) return null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: spacing.sm,
+        // Fill the composer row and forbid internal wrapping, so a long interim
+        // transcript truncates within the overlay rather than shoving the mic
+        // onto the next line. minWidth:0 lets the overlay child actually shrink.
+        flex: 1,
+        minWidth: 0,
+        flexWrap: "nowrap",
+      }}
+    >
       <button
         type="button"
         data-testid="voice-input-button"
@@ -311,6 +323,9 @@ export function VoiceInput({ onCommit, disabled = false }: VoiceInputProps) {
         style={{
           minWidth: 44,
           minHeight: 44,
+          // Never let the mic be squeezed or pushed to the next row; the overlay
+          // text truncates instead.
+          flexShrink: 0,
           borderRadius: "50%",
           border: `1px solid ${recording ? colors.dangerHover : colors.border}`,
           background: recording ? colors.danger : colors.surface,
@@ -438,6 +453,9 @@ function Waveform({ levels }: { levels: number[] }) {
         alignItems: "center",
         gap: 2,
         height: 28,
+        // Fixed-width strip: it must not shrink, so the interim text beside it is
+        // the element that truncates when the row runs out of space.
+        flexShrink: 0,
       }}
     >
       {levels.map((level, i) => (
