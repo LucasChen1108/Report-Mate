@@ -27,10 +27,13 @@ import (
 	"time"
 
 	"github.com/LucasChen1108/Report-Mate/backend/db/migrations"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/agent"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/auth"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/db"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/jobs"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/parts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
@@ -96,11 +99,34 @@ func run() error {
 	// file only hands each one the pool.
 	templatesHandler := templates.NewHandler(templates.NewPostgresStore(pool))
 	dashboardHandler := dashboard.NewHandler(pool)
+	reportsHandler := reports.NewHandler(pool)
+
+	// The agent handler builds its own gateway client from config, or leaves it
+	// nil when the gateway is unconfigured (cfg.AgentConfigured() is false), in
+	// which case the agent-fill endpoint answers 503 and the manual fill path
+	// keeps working. The chatClient interface is unexported by the agent
+	// package, so this file hands the raw URL/key/model to
+	// NewHandlerFromConfig and lets that package own the nil decision.
+	//
+	// The two context providers now back the get_job_history and
+	// get_parts_catalog tools with real data (the jobs seed and the
+	// parts_catalog table), replacing the earlier Empty* defaults. Both satisfy
+	// the agent's provider interfaces and are read-only over the pool.
+	agentHandler := agent.NewHandlerFromConfig(
+		pool,
+		cfg.LLMGatewayURL,
+		cfg.LLMGatewayAPIKey,
+		cfg.LLMModel,
+		jobs.NewHistory(pool),
+		parts.NewCatalog(pool),
+		cfg.ConversationTurnCap,
+		cfg.ConversationQuestionCap,
+	)
 
 	mux := http.NewServeMux()
 	templatesHandler.RegisterRoutes(mux)
 	dashboardHandler.RegisterRoutes(mux)
-	mountReports(mux, reports.NewHandler(pool))
+	mountReports(mux, reportsHandler, agentHandler)
 
 	identity := auth.Install(mux, pool, cfg.JWTSigningKey)
 
@@ -119,16 +145,24 @@ func run() error {
 	return serve(srv, cfg)
 }
 
-// mountReports registers the reports routes behind a request-body size limit.
+// mountReports registers the reports and agent routes behind a request-body
+// size limit.
 //
 // The routes are registered on their own mux, which the root mux then delegates
 // the whole /api/reports subtree to. ServeMux does not rewrite the path on the
 // way through, so the inner mux still matches its full "POST /api/reports"
 // style patterns — this just buys one place to wrap every report route at once,
 // without the reports package having to know about the limit.
-func mountReports(root *http.ServeMux, handler *reports.Handler) {
+//
+// The agent handler registers "POST /api/reports/{id}/agent-fill" on the SAME
+// inner mux so agent-fill inherits both the 32 MB body limit (applied here) and
+// the identity middleware (applied to the whole top-level mux in run()) — the
+// agent writes photo-bearing report content through the same path, and its
+// ownership guard reads the identity out of the request context.
+func mountReports(root *http.ServeMux, handler *reports.Handler, agentHandler *agent.Handler) {
 	reportsMux := http.NewServeMux()
 	handler.RegisterRoutes(reportsMux)
+	agentHandler.RegisterRoutes(reportsMux)
 
 	limited := limitRequestBody(reportsMux, maxReportBodyBytes)
 	// Both patterns are needed: "/api/reports" matches the collection exactly,

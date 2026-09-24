@@ -1,0 +1,404 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Add LLM gateway fields and `AgentConfigured` to `internal/config`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004177901
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004192038
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004392785
+      }
+    ],
+    "2.1 Implement `toolCall`, `stripCodeFences`, and `parseToolCall` in `internal/agent/runner.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004177922
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004193456
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004393815
+      }
+    ],
+    "3.1 Implement `RunLogEntry`, `RunLog`, and its methods in `internal/agent/runlog.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004177958
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004194809
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004394866
+      }
+    ],
+    "4.1 Define provider interfaces and empty defaults in `internal/agent/providers.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004177980
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004195696
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004395913
+      }
+    ],
+    "5.1 Implement `toolResult`, `runState`, `toolRegistry`, and `fillableType` in `internal/agent/tools.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178000
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004407545
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004811608
+      }
+    ],
+    "5.2 Implement `fill_field` validation and write": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178021
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004828118
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005057223
+      }
+    ],
+    "5.5 Implement `flag_missing_field`, `get_template_schema`, `get_job_history`, `get_parts_catalog`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178039
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005058486
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005266789
+      }
+    ],
+    "6.1 Implement the system-prompt builder in `internal/agent/prompt.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178057
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004407774
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004809017
+      }
+    ],
+    "7.1 Implement `gatewayClient` and its wire types in `internal/agent/client.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178079
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004408347
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004810458
+      }
+    ],
+    "8.1 Implement `chatClient`, `Runner`, `RunInput`, `RunResult`, and `Run` in `internal/agent/runner.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178127
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005274704
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005442802
+      }
+    ],
+    "9. Checkpoint - Ensure all backend agent-core tests pass": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178154
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005448926
+      }
+    ],
+    "10.1 Implement `persistFunc` and the `filled_by` computation in `internal/agent/handler.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178173
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005457282
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005591383
+      }
+    ],
+    "11.1 Implement `Handler`, request/response types, and `handleAgentFill` in `internal/agent/handler.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178193
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005592431
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006173421
+      }
+    ],
+    "12.1 Wire the agent handler in `cmd/server/main.go`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178212
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006180127
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006773516
+      }
+    ],
+    "13. Checkpoint - Ensure the backend builds and all tests pass": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178235
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006774437
+      }
+    ],
+    "14.1 Add `agentFill` and its types in `frontend/src/api/agent.ts`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178256
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006782609
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007251983
+      }
+    ],
+    "15.1 Create `AgentAssistPanel` in `frontend/src/pages/ReportEditor/`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178279
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007252990
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007461236
+      }
+    ],
+    "15.2 Integrate the panel into `ReportEditorPage`": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178297
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007460456
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007923331
+      }
+    ],
+    "16. Final checkpoint - Verify backend and frontend": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004178319
+      },
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007922605
+      }
+    ],
+    "1. Add gateway configuration seam": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004392823
+      }
+    ],
+    "2. Implement code-fence stripping and tool-call parsing": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004393837
+      }
+    ],
+    "3. Implement the run log": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004394894
+      }
+    ],
+    "4. Implement the context provider seams": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004395933
+      }
+    ],
+    "6. Implement the system prompt": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004809051
+      }
+    ],
+    "7. Implement the gateway client": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790004810483
+      }
+    ],
+    "5. Implement the tool registry and the six tools": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005266821
+      }
+    ],
+    "8. Implement the tool-calling loop (runner)": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005442832
+      }
+    ],
+    "10. Implement the `save_draft` persist closure and `filled_by` mapping": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790005591416
+      }
+    ],
+    "11. Implement the Agent_Endpoint handler": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006173449
+      }
+    ],
+    "12. Compose the agent into the server": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790006773543
+      }
+    ],
+    "14. Implement the frontend agent API client": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007252012
+      }
+    ],
+    "15. Implement the AgentAssistPanel and wire it into the Report Editor": [
+      {
+        "executionId": "1414f35f-6068-40f9-a77c-7f3d09402582",
+        "chatSessionId": "sess_d5e3c1e4-241f-4941-9a25-85773442bbc5",
+        "timestamp": 1790007923354
+      }
+    ]
+  }
+}
