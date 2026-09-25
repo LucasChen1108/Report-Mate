@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -95,8 +96,24 @@ func run() error {
 	}
 	log.Printf("server: migrations up to date")
 
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           newApplicationHandler(pool, cfg.IsProduction()),
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+
+	return serve(srv, cfg)
+}
+
+// newApplicationHandler composes the complete HTTP application. Keeping this
+// seam separate from listener startup lets PostgreSQL-backed journey tests use
+// the exact production route and middleware graph through httptest.
+func newApplicationHandler(pool *sql.DB, secureCookies bool) http.Handler {
 	mux := http.NewServeMux()
-	sessions := auth.Install(mux, pool, cfg.IsProduction())
+	sessions := auth.Install(mux, pool, secureCookies)
 
 	// Login and registration above are public. Every application-domain route
 	// below is mounted through the same database-backed session guard.
@@ -108,16 +125,7 @@ func run() error {
 	// The identity middleware wraps the whole mux so every route — including
 	// the RBAC-gated template writes, which read the role back out of the
 	// request context — sees a populated identity.
-	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           appmiddleware.Recovery(appmiddleware.RequestLogger(sessions.Optional(mux))),
-		ReadHeaderTimeout: readHeaderTimeout,
-		ReadTimeout:       readTimeout,
-		WriteTimeout:      writeTimeout,
-		IdleTimeout:       idleTimeout,
-	}
-
-	return serve(srv, cfg)
+	return appmiddleware.Recovery(appmiddleware.RequestLogger(sessions.Optional(mux)))
 }
 
 // mountReports registers the reports routes behind a request-body size limit.
