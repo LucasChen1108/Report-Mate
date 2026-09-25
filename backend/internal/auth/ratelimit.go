@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type LoginLimiter interface {
+type AttemptLimiter interface {
 	Allow(key string, now time.Time) bool
 }
 
@@ -14,20 +14,21 @@ type loginWindow struct {
 	count   int
 }
 
-// MemoryLoginLimiter is a process-local fixed-window limiter. It intentionally
-// stores only IP/email keys, never passwords, cookies, or other secrets.
-type MemoryLoginLimiter struct {
+// MemoryAttemptLimiter is a process-local fixed-window limiter shared by
+// authentication and code-validation entry points. It intentionally stores
+// only IP/email keys, never passwords, codes, cookies, or other secrets.
+type MemoryAttemptLimiter struct {
 	mu      sync.Mutex
 	limit   int
 	window  time.Duration
 	attempt map[string]loginWindow
 }
 
-func NewMemoryLoginLimiter(limit int, window time.Duration) *MemoryLoginLimiter {
-	return &MemoryLoginLimiter{limit: limit, window: window, attempt: make(map[string]loginWindow)}
+func NewMemoryAttemptLimiter(limit int, window time.Duration) *MemoryAttemptLimiter {
+	return &MemoryAttemptLimiter{limit: limit, window: window, attempt: make(map[string]loginWindow)}
 }
 
-func (l *MemoryLoginLimiter) Allow(key string, now time.Time) bool {
+func (l *MemoryAttemptLimiter) Allow(key string, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

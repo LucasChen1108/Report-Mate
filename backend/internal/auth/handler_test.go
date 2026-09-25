@@ -22,16 +22,45 @@ const testPassword = "StrongPassword123"
 var testNow = time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
 
 type fakeStore struct {
-	credentials        accounts.Credentials
-	credentialsErr     error
-	lookupEmail        string
-	sessions           map[string]accounts.SessionPrincipal
-	revoked            map[string]bool
-	findSessionCalls   int
-	findSessionErr     error
-	createdSession     accounts.NewSession
-	createdSessionUser string
-	revokeErr          error
+	credentials         accounts.Credentials
+	credentialsErr      error
+	lookupEmail         string
+	sessions            map[string]accounts.SessionPrincipal
+	revoked             map[string]bool
+	findSessionCalls    int
+	findSessionErr      error
+	createdSession      accounts.NewSession
+	createdSessionUser  string
+	revokeErr           error
+	registerAdminInput  accounts.NewAccount
+	registerWorkerInput accounts.NewAccount
+	registerCodeHash    []byte
+	registerSession     accounts.NewSession
+	registerErr         error
+}
+
+func (s *fakeStore) RegisterAdmin(_ context.Context, input accounts.NewAccount, codeHash []byte, session accounts.NewSession, _ time.Time) (accounts.Account, error) {
+	s.registerAdminInput, s.registerCodeHash, s.registerSession = input, codeHash, session
+	if s.registerErr != nil {
+		return accounts.Account{}, s.registerErr
+	}
+	account := s.credentials.Account
+	account.ID, account.FullName, account.Phone = input.ID, strings.TrimSpace(input.FullName), accounts.NormalizePhone(input.Phone)
+	account.PersonalEmail, account.CompanyEmail, account.Role = accounts.NormalizeEmail(input.PersonalEmail), accounts.NormalizeEmail(input.CompanyEmail), accounts.RoleAdmin
+	return account, nil
+}
+
+func (s *fakeStore) RegisterWorker(_ context.Context, input accounts.NewAccount, codeHash []byte, session accounts.NewSession, _ time.Time) (accounts.Account, error) {
+	s.registerWorkerInput, s.registerCodeHash, s.registerSession = input, codeHash, session
+	if s.registerErr != nil {
+		return accounts.Account{}, s.registerErr
+	}
+	account := s.credentials.Account
+	manager := "44444444-4444-4444-8444-444444444444"
+	account.ID, account.FullName, account.Phone = input.ID, strings.TrimSpace(input.FullName), accounts.NormalizePhone(input.Phone)
+	account.PersonalEmail, account.CompanyEmail, account.Role = accounts.NormalizeEmail(input.PersonalEmail), accounts.NormalizeEmail(input.CompanyEmail), accounts.RoleWorker
+	account.ManagerAdminID = &manager
+	return account, nil
 }
 
 func newFakeStore(t *testing.T) *fakeStore {
@@ -134,7 +163,14 @@ func newTestHandler(t *testing.T, secure bool) (*Handler, *fakeStore, *http.Serv
 	handler := NewHandler(store, sessions)
 	handler.now = func() time.Time { return testNow }
 	handler.newToken = func() (string, error) { return testRawToken(7), nil }
-	handler.newID = func() (string, error) { return "33333333-3333-4333-8333-333333333333", nil }
+	ids := []string{"33333333-3333-4333-8333-333333333333", "55555555-5555-4555-8555-555555555555"}
+	handler.newID = func() (string, error) {
+		id := ids[0]
+		if len(ids) > 1 {
+			ids = ids[1:]
+		}
+		return id, nil
+	}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	return handler, store, mux
@@ -154,6 +190,34 @@ func performLogin(t *testing.T, mux http.Handler, email, password string, cookie
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)
 	return response
+}
+
+func performRegistration(t *testing.T, mux http.Handler, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(raw))
+	request.RemoteAddr = "203.0.113.9:54321"
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	return response
+}
+
+func validRegistration(role accounts.Role) map[string]any {
+	body := map[string]any{
+		"fullName": "  Taylor User  ", "company": "Acme Services",
+		"phone": "+65 6777 8899", "personalEmail": " TAYLOR@EXAMPLE.COM ",
+		"companyEmail": " TAYLOR@ACME.EXAMPLE ", "password": testPassword,
+		"role": role,
+	}
+	if role == accounts.RoleAdmin {
+		body["companyAdminCode"] = "ADMIN-ONE"
+	} else {
+		body["joinCode"] = "WORKER-ONE"
+	}
+	return body
 }
 
 func TestLoginReturnsCanonicalUserAndHttpOnlyCookie(t *testing.T) {
@@ -209,6 +273,115 @@ func TestLoginReturnsCanonicalUserAndHttpOnlyCookie(t *testing.T) {
 				t.Fatal("persisted token hash does not match cookie digest")
 			}
 		})
+	}
+}
+
+func TestRegistrationUsesRoleSpecificTransactionAndSetsCookie(t *testing.T) {
+	for _, role := range []accounts.Role{accounts.RoleAdmin, accounts.RoleWorker} {
+		t.Run(string(role), func(t *testing.T) {
+			_, store, mux := newTestHandler(t, false)
+			response := performRegistration(t, mux, validRegistration(role))
+			if response.Code != http.StatusCreated {
+				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+			}
+			var body map[string]any
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("Unmarshal: %v", err)
+			}
+			if body["role"] != string(role) || body["personalEmail"] != "taylor@example.com" || body["companyEmail"] != "taylor@acme.example" {
+				t.Fatalf("response = %v", body)
+			}
+			if _, exists := body["token"]; exists {
+				t.Fatal("raw token appeared in registration JSON")
+			}
+			cookies := response.Result().Cookies()
+			if len(cookies) != 1 || !cookies[0].HttpOnly || cookies[0].Value != testRawToken(7) {
+				t.Fatalf("cookie = %+v", cookies)
+			}
+			var input accounts.NewAccount
+			if role == accounts.RoleAdmin {
+				input = store.registerAdminInput
+				if store.registerWorkerInput.ID != "" {
+					t.Fatal("admin registration used Worker transaction")
+				}
+			} else {
+				input = store.registerWorkerInput
+				if store.registerAdminInput.ID != "" {
+					t.Fatal("Worker registration used Admin transaction")
+				}
+			}
+			if input.ID == "" || input.PersonalEmail != "taylor@example.com" || input.CompanyEmail != "taylor@acme.example" {
+				t.Fatalf("transaction input = %+v", input)
+			}
+			if input.PasswordHash == testPassword || VerifyPassword(input.PasswordHash, testPassword) != nil {
+				t.Fatal("registration did not pass a bcrypt password hash")
+			}
+			code := "WORKER-ONE"
+			if role == accounts.RoleAdmin {
+				code = "ADMIN-ONE"
+			}
+			if !bytes.Equal(store.registerCodeHash, security.HashSecret(code)) {
+				t.Fatal("transaction did not receive the authorization-code hash")
+			}
+			if !bytes.Equal(store.registerSession.TokenHash, security.HashSecret(cookies[0].Value)) {
+				t.Fatal("transaction did not receive the session-token hash")
+			}
+		})
+	}
+}
+
+func TestRegistrationRejectsMismatchedRoleSpecificFieldsBeforeStore(t *testing.T) {
+	_, store, mux := newTestHandler(t, false)
+	body := validRegistration(accounts.RoleWorker)
+	body["companyAdminCode"] = "ADMIN-ONE"
+	response := performRegistration(t, mux, body)
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"code":"validation_error"`) {
+		t.Fatalf("response = %d: %s", response.Code, response.Body.String())
+	}
+	if store.registerAdminInput.ID != "" || store.registerWorkerInput.ID != "" {
+		t.Fatal("invalid discriminated request reached a registration transaction")
+	}
+}
+
+func TestRegistrationMapsCodeAndConflictErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+		field  string
+	}{
+		{name: "invalid", err: accounts.ErrInvalidCode, status: 422, code: "invalid_code", field: "joinCode"},
+		{name: "expired", err: accounts.ErrExpiredCode, status: 422, code: "expired_code", field: "joinCode"},
+		{name: "revoked", err: accounts.ErrRevokedCode, status: 422, code: "revoked_code", field: "joinCode"},
+		{name: "used", err: accounts.ErrUsedCode, status: 422, code: "used_code", field: "joinCode"},
+		{name: "company mismatch", err: accounts.ErrCompanyMismatch, status: 422, code: "company_mismatch", field: "company"},
+		{name: "email conflict", err: accounts.ErrEmailConflict, status: 409, code: "conflict", field: "email"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, store, mux := newTestHandler(t, false)
+			store.registerErr = tc.err
+			response := performRegistration(t, mux, validRegistration(accounts.RoleWorker))
+			if response.Code != tc.status || !strings.Contains(response.Body.String(), `"code":"`+tc.code+`"`) || !strings.Contains(response.Body.String(), `"field":"`+tc.field+`"`) {
+				t.Fatalf("response = %d: %s", response.Code, response.Body.String())
+			}
+			if len(response.Result().Cookies()) != 0 {
+				t.Fatal("failed transaction set a session cookie")
+			}
+		})
+	}
+}
+
+func TestRegistrationRateLimitReturns429BeforeSecretWork(t *testing.T) {
+	handler, store, mux := newTestHandler(t, false)
+	handler.registerLimiter = denyLimiter{}
+	response := performRegistration(t, mux, validRegistration(accounts.RoleAdmin))
+	if response.Code != http.StatusTooManyRequests || !strings.Contains(response.Body.String(), `"code":"rate_limited"`) {
+		t.Fatalf("response = %d: %s", response.Code, response.Body.String())
+	}
+	if store.registerAdminInput.ID != "" || store.registerWorkerInput.ID != "" {
+		t.Fatal("rate-limited registration reached the store")
 	}
 }
 
@@ -312,7 +485,7 @@ func (denyLimiter) Allow(string, time.Time) bool { return false }
 
 func TestLoginRateLimitReturns429WithoutCredentialLookup(t *testing.T) {
 	handler, store, mux := newTestHandler(t, false)
-	handler.limiter = denyLimiter{}
+	handler.loginLimiter = denyLimiter{}
 	response := performLogin(t, mux, "alex@example.com", testPassword, nil)
 	if response.Code != http.StatusTooManyRequests || !strings.Contains(response.Body.String(), `"code":"rate_limited"`) {
 		t.Fatalf("response = %d: %s", response.Code, response.Body.String())
