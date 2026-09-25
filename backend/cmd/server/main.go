@@ -30,11 +30,14 @@ import (
 	"github.com/LucasChen1108/Report-Mate/backend/db/migrations"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/accountapi"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/accounts"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/agent"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/auth"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/db"
 	appmiddleware "github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/jobs"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/parts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
@@ -96,6 +99,44 @@ func run() error {
 	}
 	log.Printf("server: migrations up to date")
 
+	// Stores and handlers. Each domain package owns its own persistence; this
+	// file only hands each one the pool.
+	templatesHandler := templates.NewHandler(templates.NewPostgresStore(pool))
+	dashboardHandler := dashboard.NewHandler(pool)
+	reportsHandler := reports.NewHandler(pool)
+
+	// The agent handler builds its own gateway client from config, or leaves it
+	// nil when the gateway is unconfigured (cfg.AgentConfigured() is false), in
+	// which case the agent-fill endpoint answers 503 and the manual fill path
+	// keeps working. The chatClient interface is unexported by the agent
+	// package, so this file hands the raw URL/key/model to
+	// NewHandlerFromConfig and lets that package own the nil decision.
+	//
+	// The two context providers now back the get_job_history and
+	// get_parts_catalog tools with real data (the jobs seed and the
+	// parts_catalog table), replacing the earlier Empty* defaults. Both satisfy
+	// the agent's provider interfaces and are read-only over the pool.
+	agentHandler := agent.NewHandlerFromConfig(
+		pool,
+		cfg.LLMGatewayURL,
+		cfg.LLMGatewayAPIKey,
+		cfg.LLMModel,
+		jobs.NewHistory(pool),
+		parts.NewCatalog(pool),
+		cfg.ConversationTurnCap,
+		cfg.ConversationQuestionCap,
+	)
+
+	mux := http.NewServeMux()
+	templatesHandler.RegisterRoutes(mux)
+	dashboardHandler.RegisterRoutes(mux)
+	mountReports(mux, reportsHandler, agentHandler)
+
+	identity := auth.Install(mux, pool, cfg.JWTSigningKey)
+
+	// The identity middleware wraps the whole mux so every route — including
+	// the RBAC-gated template writes, which read the role back out of the
+	// request context — sees a populated identity.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           newApplicationHandler(pool, cfg.IsProduction()),
@@ -155,6 +196,7 @@ func mountDashboard(root *http.ServeMux, handler *dashboard.Handler, requireAuth
 func mountReports(root *http.ServeMux, handler *reports.Handler, requireAuth routeMiddleware) {
 	reportsMux := http.NewServeMux()
 	handler.RegisterRoutes(reportsMux)
+	agentHandler.RegisterRoutes(reportsMux)
 
 	limited := limitRequestBody(reportsMux, maxReportBodyBytes)
 	protected := requireAuth(limited)
