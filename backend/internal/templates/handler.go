@@ -126,7 +126,7 @@ func decodeRequest(w http.ResponseWriter, r *http.Request) (templateRequest, boo
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "request body could not be decoded")
+		httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "request body could not be decoded")
 		return templateRequest{}, false
 	}
 	return req, true

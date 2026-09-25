@@ -207,6 +207,35 @@ func TestWorkerAndCodeRoutesRequireAdmin(t *testing.T) {
 	}
 }
 
+func TestEveryAccountRouteUsesAuthenticationMiddleware(t *testing.T) {
+	store := newFakeStore()
+	requireAuth := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"code":"session_expired"}`))
+		})
+	}
+	handler := NewHandler(store, requireAuth)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	routes := []struct{ method, path string }{
+		{http.MethodGet, "/api/me"},
+		{http.MethodPatch, "/api/me"},
+		{http.MethodGet, "/api/admin/workers"},
+		{http.MethodPatch, "/api/admin/workers/" + workerID},
+		{http.MethodGet, "/api/admin/join-codes"},
+		{http.MethodPost, "/api/admin/join-codes"},
+		{http.MethodDelete, "/api/admin/join-codes/44444444-4444-4444-8444-444444444444"},
+	}
+	for _, route := range routes {
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, httptest.NewRequest(route.method, route.path, bytes.NewReader([]byte(`{}`))))
+		if response.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s = %d", route.method, route.path, response.Code)
+		}
+	}
+}
+
 func TestAdminWorkerOperationsUseAuthenticatedOwnerAndConcealMissing(t *testing.T) {
 	store := newFakeStore()
 	_, mux := newTestMux(store)

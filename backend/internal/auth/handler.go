@@ -110,7 +110,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_request",
+		httpx.WriteError(w, http.StatusBadRequest, codeValidationError,
 			"The request body must be JSON with an email and a password.")
 		return
 	}
@@ -195,7 +195,7 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_request",
+		httpx.WriteError(w, http.StatusBadRequest, codeValidationError,
 			"The request body must contain valid registration details.")
 		return
 	}

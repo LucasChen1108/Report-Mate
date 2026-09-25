@@ -33,6 +33,7 @@ import (
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/db"
+	appmiddleware "github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
@@ -94,17 +95,14 @@ func run() error {
 	}
 	log.Printf("server: migrations up to date")
 
-	// Stores and handlers. Each domain package owns its own persistence; this
-	// file only hands each one the pool.
-	templatesHandler := templates.NewHandler(templates.NewPostgresStore(pool))
-	dashboardHandler := dashboard.NewHandler(pool)
-
 	mux := http.NewServeMux()
-	templatesHandler.RegisterRoutes(mux)
-	dashboardHandler.RegisterRoutes(mux)
-	mountReports(mux, reports.NewHandler(pool))
-
 	sessions := auth.Install(mux, pool, cfg.IsProduction())
+
+	// Login and registration above are public. Every application-domain route
+	// below is mounted through the same database-backed session guard.
+	mountTemplates(mux, templates.NewHandler(templates.NewPostgresStore(pool)), sessions.Require)
+	mountDashboard(mux, dashboard.NewHandler(pool), sessions.Require)
+	mountReports(mux, reports.NewHandler(pool), sessions.Require)
 	accountapi.NewHandler(accounts.NewPostgresStore(pool), sessions.Require).RegisterRoutes(mux)
 
 	// The identity middleware wraps the whole mux so every route — including
@@ -112,7 +110,7 @@ func run() error {
 	// request context — sees a populated identity.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           sessions.Optional(mux),
+		Handler:           appmiddleware.Recovery(appmiddleware.RequestLogger(sessions.Optional(mux))),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
@@ -129,15 +127,33 @@ func run() error {
 // way through, so the inner mux still matches its full "POST /api/reports"
 // style patterns — this just buys one place to wrap every report route at once,
 // without the reports package having to know about the limit.
-func mountReports(root *http.ServeMux, handler *reports.Handler) {
+type routeMiddleware func(http.Handler) http.Handler
+
+func mountTemplates(root *http.ServeMux, handler *templates.Handler, requireAuth routeMiddleware) {
+	templatesMux := http.NewServeMux()
+	handler.RegisterRoutes(templatesMux)
+	protected := requireAuth(templatesMux)
+	root.Handle("/api/templates", protected)
+	root.Handle("/api/templates/", protected)
+}
+
+func mountDashboard(root *http.ServeMux, handler *dashboard.Handler, requireAuth routeMiddleware) {
+	dashboardMux := http.NewServeMux()
+	handler.RegisterRoutes(dashboardMux)
+	protected := requireAuth(dashboardMux)
+	root.Handle("/api/dashboard/", protected)
+}
+
+func mountReports(root *http.ServeMux, handler *reports.Handler, requireAuth routeMiddleware) {
 	reportsMux := http.NewServeMux()
 	handler.RegisterRoutes(reportsMux)
 
 	limited := limitRequestBody(reportsMux, maxReportBodyBytes)
+	protected := requireAuth(limited)
 	// Both patterns are needed: "/api/reports" matches the collection exactly,
 	// "/api/reports/" the subtree beneath it.
-	root.Handle("/api/reports", limited)
-	root.Handle("/api/reports/", limited)
+	root.Handle("/api/reports", protected)
+	root.Handle("/api/reports/", protected)
 }
 
 // limitRequestBody caps the request body at max bytes for the methods that

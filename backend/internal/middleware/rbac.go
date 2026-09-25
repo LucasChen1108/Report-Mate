@@ -82,7 +82,7 @@ func writeForbidden(w http.ResponseWriter, requiredRole string) {
 	w.WriteHeader(http.StatusForbidden)
 	// Best effort: if encoding fails the status line is already written.
 	_ = json.NewEncoder(w).Encode(authorizationError{
-		Code:    "authorization_error",
-		Message: "requires the " + requiredRole + " role",
+		Code:    "forbidden",
+		Message: "This action requires the " + requiredRole + " role.",
 	})
 }

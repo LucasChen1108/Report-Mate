@@ -454,6 +454,24 @@ func TestMeRejectsMissingMalformedAndInvalidSessions(t *testing.T) {
 	}
 }
 
+func TestMeRejectsSessionForAccountDeactivatedAfterLogin(t *testing.T) {
+	_, store, mux := newTestHandler(t, false)
+	token := testRawToken(5)
+	account := store.credentials.Account
+	account.IsActive = false
+	store.sessions[string(security.HashSecret(token))] = accounts.SessionPrincipal{
+		Session: accounts.Session{ID: "session", UserID: account.ID, ExpiresAt: testNow.Add(time.Hour)},
+		Account: account,
+	}
+	request := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: token})
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), `"code":"session_expired"`) {
+		t.Fatalf("response = %d: %s", response.Code, response.Body.String())
+	}
+}
+
 func TestLoginCredentialFailuresAreIndistinguishable(t *testing.T) {
 	_, wrongPasswordStore, wrongPasswordMux := newTestHandler(t, false)
 	wrong := performLogin(t, wrongPasswordMux, "alex@example.com", "WrongPassword123", nil)

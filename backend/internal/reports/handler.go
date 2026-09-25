@@ -15,11 +15,6 @@ import (
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
 )
 
-// technicianRole is the role that is scoped to its own reports. Any other
-// authenticated role (today: dispatcher_admin) sees every report. The string
-// matches the users.role CHECK constraint in 0001_users.sql.
-const technicianRole = "technician"
-
 // createRequest is the JSON body accepted by POST /api/reports. The report is
 // always stamped with the CALLER's identity as its technician, so there is no
 // technicianId here — a client cannot file a report as someone else.
@@ -147,13 +142,10 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// A technician only ever lists their own reports, whatever the query says:
-	// the identity the auth middleware put in the request context wins over a
-	// client-supplied technicianId. Every other authenticated role sees all of
-	// them.
-	if caller.role == technicianRole {
-		filter.TechnicianID = caller.userID
-	}
+	// Stage A grants both roles Generate Report but defines no cross-user report
+	// history permission. The authenticated identity therefore always wins over
+	// a client-supplied technicianId for both roles.
+	filter = scopeReportFilter(filter, caller)
 
 	result, err := h.store.List(r.Context(), filter)
 	if err != nil {
@@ -270,7 +262,6 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 // identity is the authenticated caller: who they are and what they may see.
 type identity struct {
 	userID string
-	role   string
 }
 
 // caller reads the authenticated identity off the request context. A request
@@ -283,8 +274,7 @@ func (h *Handler) caller(w http.ResponseWriter, r *http.Request) (identity, bool
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "authentication is required")
 		return identity{}, false
 	}
-	role, _ := middleware.RoleFromContext(r.Context())
-	return identity{userID: userID, role: role}, true
+	return identity{userID: userID}, true
 }
 
 // loadOwned resolves the {id} path value, loads the report, and enforces that
@@ -292,8 +282,8 @@ func (h *Handler) caller(w http.ResponseWriter, r *http.Request) (identity, bool
 // route, so the identity check, the 404 and the ownership rule cannot be
 // applied to four routes and forgotten on the fifth.
 //
-// A technician may only reach their own reports; any other authenticated role
-// may reach all of them.
+// Both roles may reach only reports created under their own identity. Stage A
+// does not grant Admins organization-wide report-history access.
 func (h *Handler) loadOwned(w http.ResponseWriter, r *http.Request) (ReportRecord, bool) {
 	caller, ok := h.caller(w, r)
 	if !ok {
@@ -314,13 +304,20 @@ func (h *Handler) loadOwned(w http.ResponseWriter, r *http.Request) (ReportRecor
 		return ReportRecord{}, false
 	}
 
-	if caller.role == technicianRole {
-		if record.TechnicianID == nil || *record.TechnicianID != caller.userID {
-			httpx.WriteError(w, http.StatusForbidden, "authorization_error", "this report belongs to another technician")
-			return ReportRecord{}, false
-		}
+	if !ownsReport(caller, record) {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "report not found")
+		return ReportRecord{}, false
 	}
 	return record, true
+}
+
+func scopeReportFilter(filter ListFilter, caller identity) ListFilter {
+	filter.TechnicianID = caller.userID
+	return filter
+}
+
+func ownsReport(caller identity, record ReportRecord) bool {
+	return record.TechnicianID != nil && *record.TechnicianID == caller.userID
 }
 
 // decodeBody reads and decodes the JSON request body into T. A body that fails
@@ -336,7 +333,7 @@ func decodeBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "request body could not be decoded")
+		httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "request body could not be decoded")
 		return body, false
 	}
 	return body, true
@@ -362,7 +359,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 
 	if value := strings.TrimSpace(query.Get("templateId")); value != "" {
 		if !isUUID(value) {
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "templateId is not a valid identifier")
+			httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "templateId is not a valid identifier")
 			return ListFilter{}, false
 		}
 		filter.TemplateID = value
@@ -370,7 +367,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 
 	if value := strings.TrimSpace(query.Get("technicianId")); value != "" {
 		if !isUUID(value) {
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "technicianId is not a valid identifier")
+			httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "technicianId is not a valid identifier")
 			return ListFilter{}, false
 		}
 		filter.TechnicianID = value
@@ -381,7 +378,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 		case StatusDraft, StatusSubmitted, StatusExported:
 			filter.Status = value
 		default:
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "status must be draft, submitted or exported")
+			httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "status must be draft, submitted or exported")
 			return ListFilter{}, false
 		}
 	}
@@ -403,7 +400,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 	if value := strings.TrimSpace(query.Get("limit")); value != "" {
 		limit, err := strconv.Atoi(value)
 		if err != nil || limit < 1 {
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "limit must be a positive whole number")
+			httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "limit must be a positive whole number")
 			return ListFilter{}, false
 		}
 		filter.Limit = limit
@@ -412,7 +409,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 	if value := strings.TrimSpace(query.Get("offset")); value != "" {
 		offset, err := strconv.Atoi(value)
 		if err != nil || offset < 0 {
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "offset must be zero or a positive whole number")
+			httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, "offset must be zero or a positive whole number")
 			return ListFilter{}, false
 		}
 		filter.Offset = offset
@@ -439,7 +436,7 @@ func parseListFilter(w http.ResponseWriter, r *http.Request) (ListFilter, bool) 
 func parseDayParam(w http.ResponseWriter, raw, name string, exclusiveEnd bool) (*time.Time, bool) {
 	bound, err := httpx.ParseDayBound(raw, exclusiveEnd)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "bad_request", httpx.DayBoundMessage(name))
+		httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, httpx.DayBoundMessage(name))
 		return nil, false
 	}
 	return bound, true

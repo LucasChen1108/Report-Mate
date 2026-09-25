@@ -22,7 +22,7 @@ func TestRequireRoleDistinguishesAuthenticationFromAuthorization(t *testing.T) {
 	}{
 		{name: "missing identity", ctx: context.Background(), status: http.StatusUnauthorized, wantCode: "unauthenticated"},
 		{name: "legacy role without principal", ctx: WithRole(context.Background(), "dispatcher_admin"), status: http.StatusUnauthorized, wantCode: "unauthenticated"},
-		{name: "wrong role", ctx: WithPrincipal(context.Background(), Principal{UserID: "user-1", Role: "technician"}), status: http.StatusForbidden, wantCode: "authorization_error"},
+		{name: "wrong role", ctx: WithPrincipal(context.Background(), Principal{UserID: "user-1", Role: "technician"}), status: http.StatusForbidden, wantCode: "forbidden"},
 		{name: "required role", ctx: WithPrincipal(context.Background(), Principal{UserID: "user-1", Role: "dispatcher_admin"}), status: http.StatusNoContent},
 	}
 

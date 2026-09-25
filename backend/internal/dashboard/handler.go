@@ -85,7 +85,7 @@ func (h *Handler) handleTable(w http.ResponseWriter, r *http.Request) {
 	}
 	params, err := parseTableParams(r.URL.Query())
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, err.Error())
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *Handler) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	params, err := parseTableParams(r.URL.Query())
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, httpx.ValidationCode, err.Error())
 		return
 	}
 
@@ -259,7 +259,7 @@ func parseTableParams(query url.Values) (tableParams, error) {
 func requireUser(w http.ResponseWriter, r *http.Request) (string, bool) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "You must be signed in to do that.")
 		return "", false
 	}
 	return userID, true
