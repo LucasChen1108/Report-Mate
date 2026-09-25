@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/LucasChen1108/Report-Mate/backend/db/migrations"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/accountapi"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/accounts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/auth"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
@@ -102,14 +104,15 @@ func run() error {
 	dashboardHandler.RegisterRoutes(mux)
 	mountReports(mux, reports.NewHandler(pool))
 
-	identity := auth.Install(mux, pool, cfg.IsProduction())
+	sessions := auth.Install(mux, pool, cfg.IsProduction())
+	accountapi.NewHandler(accounts.NewPostgresStore(pool), sessions.Require).RegisterRoutes(mux)
 
 	// The identity middleware wraps the whole mux so every route — including
 	// the RBAC-gated template writes, which read the role back out of the
 	// request context — sees a populated identity.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           identity(mux),
+		Handler:           sessions.Optional(mux),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
