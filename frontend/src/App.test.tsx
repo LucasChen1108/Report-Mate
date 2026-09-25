@@ -414,7 +414,7 @@ describe("role-aware navigation", () => {
       name: "Application",
     });
     expect(within(navigation).getAllByRole("link").map((link) => link.textContent))
-      .toEqual(["Generate Report", "Templates", "Workers"]);
+      .toEqual(["Generate Report", "My Reports", "Templates", "Workers"]);
     expect(within(navigation).getByRole("button", { name: "Logout" }))
       .toBeInTheDocument();
     expect(within(navigation).queryByRole("link", { name: "My Profile" }))
@@ -428,7 +428,7 @@ describe("role-aware navigation", () => {
       name: "Application",
     });
     expect(within(navigation).getAllByRole("link").map((link) => link.textContent))
-      .toEqual(["Generate Report", "My Profile"]);
+      .toEqual(["Generate Report", "My Reports", "My Profile"]);
     expect(within(navigation).getByRole("button", { name: "Logout" }))
       .toBeInTheDocument();
     expect(within(navigation).queryByRole("link", { name: "Templates" }))

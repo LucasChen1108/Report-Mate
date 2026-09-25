@@ -26,4 +26,11 @@ describe("frontend configuration", () => {
     expect(() => parseFrontendConfig({ VITE_AUTH_MODE: "production" }))
       .toThrow(/Unsupported VITE_AUTH_MODE/);
   });
+
+  it("rejects mock authentication in production", () => {
+    expect(() => parseFrontendConfig({ PROD: true, VITE_AUTH_MODE: "mock" }))
+      .toThrow(/must be "api" for production builds/);
+    expect(parseFrontendConfig({ PROD: true, VITE_AUTH_MODE: "api" }).authMode)
+      .toBe("api");
+  });
 });

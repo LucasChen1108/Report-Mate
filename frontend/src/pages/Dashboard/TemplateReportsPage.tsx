@@ -21,6 +21,7 @@
 // branches.
 
 import { Link, useParams } from "react-router-dom";
+import { ROUTES, routeBuilders } from "../../config/routes";
 import { ReportFilters } from "./ReportFilters";
 import { ReportTable } from "./ReportTable";
 import { EmptyState } from "./EmptyState";
@@ -87,7 +88,7 @@ export function TemplateReportsPage() {
     >
       <header style={{ display: "flex", flexDirection: "column", gap: spacing.sm, minWidth: 0 }}>
         <Link
-          to="/dashboard"
+          to={ROUTES.dashboard}
           data-testid="back-to-dashboard"
           style={{
             display: "inline-flex",
@@ -131,7 +132,7 @@ export function TemplateReportsPage() {
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: spacing.sm }}>
             <Link
-              to={`/reports/new?templateId=${encodeURIComponent(templateId)}`}
+              to={routeBuilders.newReport(templateId)}
               data-testid="new-report-button"
               style={{
                 ...primaryButtonStyle,
@@ -243,7 +244,7 @@ export function TemplateReportsPage() {
           title="We could not load these reports"
           message={error}
           primaryAction={{ label: "Try again", onClick: reload }}
-          secondaryAction={{ label: "Back to dashboard", to: "/dashboard" }}
+          secondaryAction={{ label: "Back to dashboard", to: ROUTES.dashboard }}
         />
       )}
 
@@ -263,7 +264,7 @@ export function TemplateReportsPage() {
               ? { label: "Clear filters", onClick: clearFilters }
               : {
                   label: "Start a report",
-                  to: `/reports/new?templateId=${encodeURIComponent(templateId)}`,
+                  to: routeBuilders.newReport(templateId),
                 }
           }
         />

@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "./AuthProvider";
+import { SESSION_INVALID_EVENT } from "../api/client";
 import { USER_ROLES } from "./contracts";
 import type {
   AuthUser,
@@ -333,6 +334,24 @@ describe("AuthProvider", () => {
     await act(async () => loginPromise);
 
     expect(result.current.user).toBeNull();
+  });
+
+  it("clears the current user when any API surface reports an invalid session", async () => {
+    const auth = createAuthService({
+      getCurrentUser: vi.fn(async () => adminUser),
+    });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(auth),
+    });
+    await waitForRestoration(result);
+    expect(result.current.user).toEqual(adminUser);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(SESSION_INVALID_EVENT));
+    });
+
+    await waitFor(() => expect(result.current.user).toBeNull());
+    expect(auth.logout).toHaveBeenCalledOnce();
   });
 
   it("performs only one restoration during Strict Mode effect replay", async () => {

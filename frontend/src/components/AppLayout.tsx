@@ -76,6 +76,9 @@ export function AppLayout() {
         <NavLink to={ROUTES.generateReport} style={linkStyle}>
           Generate Report
         </NavLink>
+        <NavLink to={ROUTES.dashboard} style={linkStyle}>
+          My Reports
+        </NavLink>
         {user.role === USER_ROLES.admin ? (
           <>
             <NavLink to={ROUTES.templates} style={linkStyle}>

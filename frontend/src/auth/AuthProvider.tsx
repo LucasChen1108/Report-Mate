@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import type { AuthUser, LoginInput, RegistrationInput } from "./contracts";
+import { SESSION_INVALID_EVENT } from "../api/client";
 import { isServiceError } from "../services/errors";
 import type { AuthService } from "../services/contracts";
 import { useServices } from "../services/ServiceProvider";
@@ -95,6 +96,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (operation === operationRef.current) {
         operationRef.current += 1;
       }
+    };
+  }, [auth]);
+
+  useEffect(() => {
+    const clearInvalidSession = () => {
+      operationRef.current += 1;
+      if (mountedRef.current) {
+        setUser(null);
+        setIsRestoring(false);
+      }
+      void clearServiceSession(auth);
+    };
+
+    window.addEventListener(SESSION_INVALID_EVENT, clearInvalidSession);
+    return () => {
+      window.removeEventListener(SESSION_INVALID_EVENT, clearInvalidSession);
     };
   }, [auth]);
 

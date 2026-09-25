@@ -49,6 +49,8 @@ describe("the report endpoints", () => {
     await createReport({ templateId: "tpl_1" });
     const { url, init, body } = lastCall();
     expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+    expect(new Headers(init.headers).has("Authorization")).toBe(false);
     expect(url).toBe("/api/reports");
     expect(body).toEqual({ templateId: "tpl_1" });
   });
@@ -106,12 +108,12 @@ describe("error mapping (inherited from api/client)", () => {
       Promise.resolve({
         ok: false,
         status: 422,
-        json: () =>
-          Promise.resolve({
+        text: () =>
+          Promise.resolve(JSON.stringify({
             code: "validation_error",
             message: "Meter reading is required",
             elementId: "fld_meter_reading",
-          }),
+          })),
       } as Response),
     );
 

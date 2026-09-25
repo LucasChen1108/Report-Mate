@@ -45,6 +45,7 @@ import type { ReportRecord } from "../api/reportTypes";
 import { createReport, getReport } from "../api/reports";
 import { getTemplate } from "../api/templates";
 import { ReportEditorPage } from "../pages/ReportEditor/ReportEditorPage";
+import { ROUTES, routeBuilders } from "../config/routes";
 import { colors, fontSize, radius, spacing } from "../styles/tokens";
 
 // What the route is holding while it resolves the two entry paths.
@@ -164,7 +165,7 @@ export function ReportEditorRoute() {
     const key = `report:${state.report.id}`;
     inFlight.current = { key, promise: Promise.resolve(state) };
     loadedKey.current = key;
-    navigate(`/reports/${state.report.id}`, { replace: true });
+    navigate(routeBuilders.report(state.report.id), { replace: true });
   }, [state, reportId, fixtureId, navigate]);
 
   // Dev escape hatch — render the bundled fixture, no backend involved.
@@ -180,7 +181,7 @@ export function ReportEditorRoute() {
     return (
       <RouteMessage title="Could not open this report" detail={state.message}>
         <Link
-          to="/dashboard"
+          to={ROUTES.dashboard}
           style={{
             display: "inline-block",
             minHeight: 44,
