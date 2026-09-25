@@ -16,10 +16,8 @@ const roleContextKey contextKey = "middleware.role"
 
 // WithRole returns a copy of ctx carrying the given authenticated user role.
 //
-// NOTE: The real auth middleware (package auth, owned separately) will be the
-// production caller that populates the role into the request context after it
-// validates the session/JWT. Until that middleware exists, this exported helper
-// provides the seam: auth (or tests) call WithRole to attach the role, and
+// The auth middleware is the production caller. This helper remains available
+// for focused handler tests: auth or tests call WithRole to attach the role, and
 // RequireRole reads it back via RoleFromContext. This keeps RequireRole
 // self-contained and testable now, with a clear integration point later.
 func WithRole(ctx context.Context, role string) context.Context {
@@ -29,6 +27,9 @@ func WithRole(ctx context.Context, role string) context.Context {
 // RoleFromContext reads the authenticated user's role from ctx. The boolean
 // result is false when no role has been attached to the context.
 func RoleFromContext(ctx context.Context) (string, bool) {
+	if principal, ok := PrincipalFromContext(ctx); ok && principal.Role != "" {
+		return principal.Role, true
+	}
 	role, ok := ctx.Value(roleContextKey).(string)
 	return role, ok
 }
@@ -41,11 +42,9 @@ type authorizationError struct {
 	Message string `json:"message"`
 }
 
-// RequireRole returns middleware that permits a request to proceed only when
-// the authenticated user's role (read from the request context, as populated by
-// the auth middleware) matches role. When the role is absent from the context
-// or does not match, it writes HTTP 403 with an authorization error and does
-// not call the next handler.
+// RequireRole permits a request only when the authoritative principal populated
+// by the auth middleware has the requested role. A missing principal receives
+// 401; an authenticated caller with the wrong role receives 403.
 //
 // Read routes are typically left ungated; this is applied to write routes such
 // as report_templates create/update to enforce the dispatcher-admin role
@@ -53,14 +52,27 @@ type authorizationError struct {
 func RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userRole, ok := RoleFromContext(r.Context())
-			if !ok || userRole != role {
+			principal, ok := PrincipalFromContext(r.Context())
+			if !ok {
+				writeUnauthenticated(w)
+				return
+			}
+			if principal.Role != role {
 				writeForbidden(w, role)
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func writeUnauthenticated(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(authorizationError{
+		Code:    "unauthenticated",
+		Message: "You must be signed in to do that.",
+	})
 }
 
 // writeForbidden emits a 403 response with the authorization error JSON body,
@@ -70,7 +82,7 @@ func writeForbidden(w http.ResponseWriter, requiredRole string) {
 	w.WriteHeader(http.StatusForbidden)
 	// Best effort: if encoding fails the status line is already written.
 	_ = json.NewEncoder(w).Encode(authorizationError{
-		Code:    "authorization_error",
-		Message: "requires the " + requiredRole + " role",
+		Code:    "forbidden",
+		Message: "This action requires the " + requiredRole + " role.",
 	})
 }

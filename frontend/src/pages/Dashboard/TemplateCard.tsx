@@ -17,6 +17,7 @@
 // useDashboard.ts.
 
 import { Link } from "react-router-dom";
+import { routeBuilders } from "../../config/routes";
 import type { DashboardTemplateRollup } from "../../api/reportTypes";
 import {
   colors,
@@ -33,8 +34,8 @@ export interface TemplateCardProps {
 
 export function TemplateCard({ rollup }: TemplateCardProps) {
   const hasReports = rollup.reportCount > 0;
-  const reportsHref = `/dashboard/templates/${encodeURIComponent(rollup.templateId)}`;
-  const newReportHref = `/reports/new?templateId=${encodeURIComponent(rollup.templateId)}`;
+  const reportsHref = routeBuilders.dashboardTemplate(rollup.templateId);
+  const newReportHref = routeBuilders.newReport(rollup.templateId);
 
   return (
     <article

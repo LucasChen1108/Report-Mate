@@ -1,20 +1,30 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    // Proxy /api to the Go server so the frontend calls same-origin paths in
-    // dev and the backend never needs CORS configured. api/client.ts leaves
-    // BASE_URL empty by default, which makes every request land here.
-    proxy: {
-      "/api": "http://localhost:8080",
+export default defineConfig(({ mode }) => {
+  const environment = loadEnv(mode, ".", "");
+  if (mode === "production" && environment.VITE_AUTH_MODE !== "api") {
+    throw new Error(
+      'Production builds require VITE_AUTH_MODE="api"; mock accounts are development-only.',
+    );
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      // Proxy both public auth and protected API paths so cookie sessions remain
+      // same-origin during local development.
+      proxy: {
+        "/api": "http://localhost:8080",
+        "/auth": "http://localhost:8080",
+      },
     },
-  },
-  test: {
-    globals: true,
-    environment: "jsdom",
-  },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+    },
+  };
 });

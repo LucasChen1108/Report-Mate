@@ -1,0 +1,206 @@
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding-top: calc(var(--rm-space-xl) * 2);
+  padding-bottom: calc(var(--rm-space-xl) * 2);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 680px;
+  padding: var(--rm-space-xl);
+  border: 1px solid var(--rm-color-border-subtle);
+  border-radius: var(--rm-radius-lg);
+  background: var(--rm-color-surface);
+  box-shadow: 0 12px 30px rgb(20 71 127 / 10%);
+}
+
+.auth-card__header {
+  margin-bottom: var(--rm-space-xl);
+}
+
+.auth-card__header h1,
+.auth-card__header p,
+.auth-card__alternate,
+.auth-form p {
+  margin-top: 0;
+}
+
+.auth-card__header h1 {
+  margin-bottom: var(--rm-space-sm);
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.auth-card__header p:last-child {
+  margin-bottom: 0;
+  color: var(--rm-color-text-muted);
+}
+
+.auth-card__eyebrow {
+  margin-bottom: var(--rm-space-xs);
+  color: var(--rm-color-primary);
+  font-size: var(--rm-font-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--rm-space-lg);
+}
+
+.auth-form__grid {
+  display: grid;
+  gap: var(--rm-space-lg);
+}
+
+.auth-field {
+  display: grid;
+  gap: var(--rm-space-xs);
+}
+
+.auth-field label,
+.auth-role legend {
+  font-weight: 700;
+}
+
+.auth-field input {
+  width: 100%;
+  min-height: var(--rm-tap-target);
+  padding: var(--rm-space-sm) var(--rm-space-md);
+  border: 1px solid var(--rm-color-border);
+  border-radius: var(--rm-radius-md);
+  background: var(--rm-color-surface);
+}
+
+.auth-field input[aria-invalid="true"] {
+  border-width: 2px;
+  border-color: var(--rm-color-danger);
+}
+
+.auth-field__help,
+.auth-field__error,
+.auth-form__status {
+  margin-bottom: 0;
+  font-size: var(--rm-font-sm);
+}
+
+.auth-field__help {
+  color: var(--rm-color-text-muted);
+}
+
+.auth-field__error {
+  color: var(--rm-color-danger-text);
+  font-weight: 600;
+}
+
+.auth-form__alert {
+  padding: var(--rm-space-md);
+  border: 2px solid var(--rm-color-danger);
+  border-radius: var(--rm-radius-md);
+  background: #fff3f1;
+  color: var(--rm-color-danger-text);
+  font-weight: 600;
+}
+
+.auth-form__submit {
+  width: 100%;
+  padding: var(--rm-space-sm) var(--rm-space-lg);
+  border: 1px solid var(--rm-color-primary-hover);
+  border-radius: var(--rm-radius-md);
+  background: var(--rm-color-primary);
+  color: var(--rm-color-on-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-form__submit:hover:not(:disabled) {
+  background: var(--rm-color-primary-hover);
+}
+
+.auth-form__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.auth-form__status {
+  min-height: 1.5em;
+  color: var(--rm-color-text-muted);
+  text-align: center;
+}
+
+.auth-card__alternate {
+  margin-bottom: 0;
+  padding-top: var(--rm-space-lg);
+  border-top: 1px solid var(--rm-color-border-subtle);
+  text-align: center;
+}
+
+.auth-card a {
+  color: var(--rm-color-primary);
+  font-weight: 700;
+}
+
+.auth-role {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.auth-role > p {
+  margin-bottom: var(--rm-space-sm);
+  color: var(--rm-color-text-muted);
+  font-size: var(--rm-font-sm);
+}
+
+.auth-role__options {
+  display: grid;
+  gap: var(--rm-space-sm);
+}
+
+.auth-role__options label {
+  display: flex;
+  min-height: var(--rm-tap-target);
+  align-items: flex-start;
+  gap: var(--rm-space-md);
+  padding: var(--rm-space-md);
+  border: 1px solid var(--rm-color-border);
+  border-radius: var(--rm-radius-md);
+  cursor: pointer;
+}
+
+.auth-role__options label:has(input:checked) {
+  border-width: 2px;
+  border-color: var(--rm-color-primary);
+  background: var(--rm-color-seed-badge-bg);
+}
+
+.auth-role__options input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--rm-color-primary);
+}
+
+.auth-role__options span {
+  display: grid;
+  gap: var(--rm-space-xs);
+}
+
+.auth-role__options small {
+  color: var(--rm-color-text-muted);
+  font-size: var(--rm-font-sm);
+}
+
+@media (min-width: 600px) {
+  .auth-form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auth-role__options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

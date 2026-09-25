@@ -8,35 +8,28 @@
 //     seed templates with a "Seed" badge for clarity (they still appear
 //     together in the one list),
 //   - provides an "open" affordance per template that loads that template's
-//     FULL schema via getTemplate(id) (Req 5.2) and then hands the loaded
-//     record to onOpen(record) so the shell/router can mount the
-//     TemplateBuilderPage with initialSchema / initialName / initialTemplateId,
-//   - provides a "New template" affordance via onNew(),
+//     FULL schema via getTemplate(id) (Req 5.2), then navigates to its edit URL
+//     with the loaded record in typed navigation state,
+//   - provides a "New template" affordance that navigates to /templates/new,
 //   - handles loading and error states for both the list fetch and each open
 //     fetch (a failed open shows a message and does NOT navigate).
 //
-// All backend calls go through frontend/src/api/templates.ts — no direct fetch.
+// All persistence calls go through the injected TemplateService. Components do
+// not know whether that service is backed by the API or development mocks.
 //
 // OUT OF SCOPE here (owned by other tasks):
 //   - TemplateBuilderPage itself (task 11.1) — this page only receives callbacks
 //     and never imports/edits it.
-//   - the app-level router wiring of onOpen/onNew (task 11.3 / shell).
 //   - styling polish (task 12.1): styling here is minimal with large tap
 //     targets only.
 //   - tests (tasks 11.4 / 11.5).
 
 import { useCallback, useEffect, useState } from "react";
-import { getTemplate, listTemplates } from "../../api/templates";
-import type { TemplateRecord, TemplateSummary } from "../../api/templates";
-
-interface TemplateListPageProps {
-  // Wired by the shell/router (task 11.3). Given the fully loaded record, the
-  // shell mounts TemplateBuilderPage with initialSchema={record.schema},
-  // initialName={record.name}, initialTemplateId={record.id}.
-  onOpen: (record: TemplateRecord) => void;
-  // Wired by the shell/router to mount a fresh TemplateBuilderPage.
-  onNew: () => void;
-}
+import { useNavigate } from "react-router-dom";
+import { routeBuilders, ROUTES } from "../../config/routes";
+import type { TemplateEditNavigationState } from "../../routing/navigationState";
+import type { TemplateSummary } from "../../services/contracts";
+import { useServices } from "../../services/ServiceProvider";
 
 // Minimal control styling with large (>=44px) tap targets. Full styling is
 // task 12.1.
@@ -63,7 +56,9 @@ const openButtonStyle: React.CSSProperties = {
   border: "1px solid #1a5fb4",
 };
 
-export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
+export function TemplateListPage() {
+  const navigate = useNavigate();
+  const { templates: templateService } = useServices();
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -79,7 +74,7 @@ export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
     setLoading(true);
     setListError(null);
     try {
-      const summaries = await listTemplates();
+      const summaries = await templateService.list();
       setTemplates(summaries);
     } catch (err) {
       setListError(
@@ -90,7 +85,7 @@ export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [templateService]);
 
   // Retrieve the list on mount (Req 5.4).
   useEffect(() => {
@@ -98,14 +93,16 @@ export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
   }, [loadList]);
 
   // Open flow: load the FULL schema for this template (Req 5.2), then hand the
-  // loaded record to onOpen. On failure show a message and do not navigate.
+  // loaded record to the edit route. On failure show a message and do not
+  // navigate. TemplateBuilderRoute can also load by URL for direct visits.
   const handleOpen = useCallback(
     async (id: string) => {
       setOpeningId(id);
       setOpenError(null);
       try {
-        const record = await getTemplate(id);
-        onOpen(record);
+        const record = await templateService.get(id);
+        const state: TemplateEditNavigationState = { template: record };
+        navigate(routeBuilders.template(record.id), { state });
       } catch (err) {
         setOpenError(
           err instanceof Error
@@ -116,7 +113,7 @@ export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
         setOpeningId(null);
       }
     },
-    [onOpen],
+    [navigate, templateService],
   );
 
   return (
@@ -134,7 +131,7 @@ export function TemplateListPage({ onOpen, onNew }: TemplateListPageProps) {
         <h1 style={{ margin: 0 }}>Templates</h1>
         <button
           type="button"
-          onClick={onNew}
+          onClick={() => navigate(ROUTES.newTemplate)}
           data-testid="new-template-button"
           style={primaryButtonStyle}
         >

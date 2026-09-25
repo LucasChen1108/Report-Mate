@@ -22,7 +22,7 @@
 // <SaveBar>. The page tracks whether it is editing an existing template
 // (templateId), the in-flight saving flag, and the save status, and decides
 // create-vs-update here (co-located with the schema/templateId state). All
-// backend calls flow through api/templates.ts (Req 5.7).
+// persistence calls flow through the injected TemplateService (Req 5.7).
 //
 // OUT OF SCOPE here (leave the seams for those tasks):
 //   - 10.4: FieldPropertyEditor / OptionListEditor.
@@ -40,13 +40,8 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import type { TemplateSchema } from "../../api/types";
-import {
-  ApiAuthorizationError,
-  ApiError,
-  ApiValidationError,
-  createTemplate,
-  updateTemplate,
-} from "../../api/templates";
+import { TemplateValidationError } from "../../services/errors";
+import { useServices } from "../../services/ServiceProvider";
 import { builderReducer } from "./builderReducer";
 import type { BuilderAction } from "./builderReducer";
 import { FieldPalette } from "./FieldPalette";
@@ -137,6 +132,7 @@ export function TemplateBuilderPage({
   onSchemaChange,
   onNameChange,
 }: TemplateBuilderPageProps) {
+  const { templates: templateService } = useServices();
   const [schema, rawDispatch] = useReducer(
     builderReducer,
     initialSchema,
@@ -188,7 +184,7 @@ export function TemplateBuilderPage({
   //   - On success: clear dirty and show a brief saved indicator.
   //   - On failure: RETAIN all unsaved edits (nothing is cleared) and surface
   //     the error; for a 422 include the offending elementId (Req 5.6). All
-  //     calls go through api/templates.ts (Req 5.7).
+  //     calls go through TemplateService (Req 5.7).
   const handleSave = async () => {
     if (saving) return;
 
@@ -203,8 +199,11 @@ export function TemplateBuilderPage({
     try {
       const record =
         templateId !== undefined
-          ? await updateTemplate(templateId, { name: trimmedName, schema })
-          : await createTemplate({ name: trimmedName, schema });
+          ? await templateService.update(templateId, {
+              name: trimmedName,
+              schema,
+            })
+          : await templateService.create({ name: trimmedName, schema });
 
       // A create returns the new id; keep it so the next save updates.
       setTemplateId(record.id);
@@ -213,16 +212,12 @@ export function TemplateBuilderPage({
     } catch (err) {
       // Retain all unsaved edits (state is untouched on every branch below) and
       // surface the error (Req 5.6).
-      if (err instanceof ApiValidationError) {
+      if (err instanceof TemplateValidationError) {
         setSaveStatus({
           kind: "error",
           message: err.message,
           elementId: err.elementId,
         });
-      } else if (err instanceof ApiAuthorizationError) {
-        setSaveStatus({ kind: "error", message: err.message });
-      } else if (err instanceof ApiError) {
-        setSaveStatus({ kind: "error", message: err.message });
       } else {
         // Network / unexpected failure.
         setSaveStatus({

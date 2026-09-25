@@ -10,7 +10,7 @@ and the **only** connection to the LLM gateway.
 backend/
 ├── cmd/server/         # main.go — process entrypoint, config load, router wiring
 ├── internal/
-│   ├── auth/           # login, sessions/JWT, role selection
+│   ├── auth/           # login, opaque cookie sessions, identity loading
 │   ├── middleware/     # auth check, RBAC, request logging, error formatting
 │   ├── jobs/           # jobs + history (also the agent's context source)
 │   ├── templates/      # report_templates CRUD + schema validation

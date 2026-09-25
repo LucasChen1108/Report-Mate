@@ -1,7 +1,7 @@
 // Package middleware provides the cross-cutting HTTP layer.
 //
 // Four distinct pieces (not one blob):
-//   - Auth check: validate the session/JWT on protected routes, reject
+//   - Auth check: validate the opaque session on protected routes, reject
 //     unauthenticated requests, attach the user identity to the request context.
 //   - RBAC: restrict dispatcher-only routes (template management, dashboard)
 //     to the dispatcher-admin role; reject wrong-role requests.

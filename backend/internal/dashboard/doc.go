@@ -28,7 +28,8 @@
 // SCOPING. Every query in this package is filtered to the calling user with
 // `r.technician_id = $me`, unconditionally, for every role. A user sees their
 // own reports and nobody else's. The identity comes from the request context,
-// put there by the auth package's JWT middleware (internal/auth/middleware.go);
+// put there by the auth package's cookie-session middleware
+// (internal/auth/middleware.go);
 // requireUser answers 401 when it is absent rather than substituting a default.
 //
 // The package is strictly read-only — every write path belongs to templates or
