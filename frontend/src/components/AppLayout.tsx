@@ -66,13 +66,6 @@ export function AppLayout() {
       : [{ to: ROUTES.profile, label: "My Profile", Icon: ProfileIcon }]),
   ];
 
-  const previewDraft = () => {
-    if (!draft) return;
-    const state: ReportPreviewNavigationState = { previewTemplateDraft: true };
-    setMenuOpen(false);
-    navigate(ROUTES.generateReport, { state });
-  };
-
   // Navigation state for a nav item. Generate Report carries the preview state
   // when a builder draft exists, so clicking it opens that draft directly in the
   // report editor; with no draft it navigates plainly and the editor falls back
@@ -147,37 +140,10 @@ export function AppLayout() {
       </nav>
       )}
 
-      {/* Admin-only "preview builder template" action — desktop placement,
-          unchanged from before. On mobile it lives in the overflow menu. */}
-      {!isMobile && isAdmin && draft && (
-        <div
-          className="rm-no-print rm-desktop-nav"
-          aria-label="Template tools"
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            padding: `${spacing.sm}px ${spacing.lg}px 0`,
-          }}
-        >
-          <button
-            type="button"
-            onClick={previewDraft}
-            title="Render the template you're building"
-            style={{
-              minHeight: 44,
-              padding: `${spacing.xs}px ${spacing.md}px`,
-              fontSize: fontSize.sm,
-              borderRadius: radius.md,
-              border: `1px solid ${colors.primary}`,
-              background: colors.onPrimary,
-              color: colors.primary,
-              cursor: "pointer",
-            }}
-          >
-            Preview builder template in renderer →
-          </button>
-        </div>
-      )}
+      {/* The dedicated "preview builder template" action was removed: the
+          Generate Report nav item now opens the live builder draft directly
+          (it carries the preview navigation state when a draft exists), so a
+          separate button would just duplicate it. */}
 
       {/* ---- Mobile header (<600px): title + overflow menu ---- */}
       {isMobile && (
@@ -210,17 +176,6 @@ export function AppLayout() {
           so the bar stays uncluttered). */}
       {isMobile && menuOpen && (
         <div className="rm-no-print rm-mobile-menu" role="menu">
-          {isAdmin && draft && (
-            <button
-              type="button"
-              role="menuitem"
-              className="rm-mobile-menu__item"
-              onClick={previewDraft}
-            >
-              <TemplatesIcon size={20} />
-              Preview builder template
-            </button>
-          )}
           <button
             type="button"
             role="menuitem"

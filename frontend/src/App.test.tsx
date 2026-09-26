@@ -215,28 +215,19 @@ describe("application routing", () => {
     expect(await screen.findByLabelText("Template name")).toHaveValue("");
   });
 
-  it("previews the live builder draft without changing ordinary report visits", async () => {
+  it("Generate Report previews the live builder draft directly", async () => {
     const user = userEvent.setup();
     await renderApp([ROUTES.newTemplate]);
 
+    // Editing the builder publishes the working draft into the shared context.
     const nameInput = await screen.findByLabelText("Template name");
     await user.type(nameInput, "Live Draft");
-    await user.click(
-      screen.getByRole("button", {
-        name: "Preview builder template in renderer →",
-      }),
-    );
 
-    expect(screen.getByText("Previewing:")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Live Draft" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId("fixture-switcher")).not.toBeInTheDocument();
-
-    // With a live builder draft present, the Generate Report nav link opens that
-    // draft's preview directly (it carries the preview navigation state), so it
-    // keeps showing the draft rather than falling back to the fixture harness.
+    // The dedicated "Preview builder template" button was removed: the Generate
+    // Report nav item now opens the live draft's preview directly, because it
+    // carries the preview navigation state whenever a draft exists.
     await user.click(screen.getByRole("link", { name: "Generate Report" }));
+
     expect(screen.getByText("Previewing:")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Live Draft" }),
