@@ -117,7 +117,15 @@ export function TemplateListPage() {
   );
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: 16 }}>
+    <main
+      style={{
+        width: "100%",
+        maxWidth: 720,
+        margin: "0 auto",
+        padding: 16,
+        boxSizing: "border-box",
+      }}
+    >
       <header
         style={{
           display: "flex",
@@ -202,17 +210,29 @@ export function TemplateListPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    flexWrap: "wrap",
                     gap: 8,
+                    // Take the remaining row width and allow shrinking so a long
+                    // name wraps inside the row instead of overflowing the screen.
+                    flex: "1 1 0",
                     minWidth: 0,
                   }}
                 >
-                  <span style={{ fontSize: 16, wordBreak: "break-word" }}>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      minWidth: 0,
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                    }}
+                  >
                     {template.name}
                   </span>
                   {template.isSeed && (
                     <span
                       data-testid="seed-badge"
                       style={{
+                        flexShrink: 0,
                         fontSize: 12,
                         fontWeight: 600,
                         padding: "2px 8px",
@@ -233,6 +253,8 @@ export function TemplateListPage() {
                   data-testid="open-template-button"
                   style={{
                     ...openButtonStyle,
+                    // Keep the action a fixed size on the right; the name wraps.
+                    flexShrink: 0,
                     opacity: openingId !== null && !isOpening ? 0.6 : 1,
                   }}
                 >
