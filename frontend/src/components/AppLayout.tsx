@@ -73,6 +73,15 @@ export function AppLayout() {
     navigate(ROUTES.generateReport, { state });
   };
 
+  // Navigation state for a nav item. Generate Report carries the preview state
+  // when a builder draft exists, so clicking it opens that draft directly in the
+  // report editor; with no draft it navigates plainly and the editor falls back
+  // to the seed-fixture harness (option b). Every other item navigates plainly.
+  const navStateFor = (to: string): ReportPreviewNavigationState | undefined =>
+    to === ROUTES.generateReport && draft
+      ? { previewTemplateDraft: true }
+      : undefined;
+
   const handleLogout = async () => {
     if (logoutPendingRef.current) return;
     logoutPendingRef.current = true;
@@ -111,7 +120,7 @@ export function AppLayout() {
         </strong>
 
         {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} style={linkStyle}>
+          <NavLink key={item.to} to={item.to} state={navStateFor(item.to)} style={linkStyle}>
             {item.label}
           </NavLink>
         ))}
@@ -235,6 +244,7 @@ export function AppLayout() {
             <NavLink
               key={to}
               to={to}
+              state={navStateFor(to)}
               className="rm-bottom-nav__tab"
               onClick={() => setMenuOpen(false)}
             >

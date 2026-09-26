@@ -233,8 +233,15 @@ describe("application routing", () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId("fixture-switcher")).not.toBeInTheDocument();
 
+    // With a live builder draft present, the Generate Report nav link opens that
+    // draft's preview directly (it carries the preview navigation state), so it
+    // keeps showing the draft rather than falling back to the fixture harness.
     await user.click(screen.getByRole("link", { name: "Generate Report" }));
-    expect(screen.getByTestId("fixture-switcher")).toBeInTheDocument();
+    expect(screen.getByText("Previewing:")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Live Draft" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("fixture-switcher")).not.toBeInTheDocument();
   });
 
   it("supports browser-style back and forward navigation", async () => {
