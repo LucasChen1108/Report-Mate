@@ -68,7 +68,7 @@ function OptionRow({
   return (
     <div
       data-testid={`option-row-${field.id}-${index}`}
-      style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}
+      style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, minWidth: 0 }}
     >
       <input
         type="text"
@@ -91,6 +91,8 @@ function OptionRow({
         onPointerDown={stopDnd}
         style={{
           flex: 1,
+          minWidth: 0,
+          boxSizing: "border-box",
           minHeight: 44,
           fontSize: 16,
           padding: "8px 10px",
@@ -109,6 +111,7 @@ function OptionRow({
         }
         style={{
           ...tapTarget,
+          flexShrink: 0,
           border: "1px solid #a00",
           borderRadius: 8,
           background: canRemove ? "#fff" : "#eee",
