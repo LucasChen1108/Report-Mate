@@ -181,3 +181,142 @@ textarea {
   color: var(--rm-color-on-primary);
   border-color: var(--rm-color-primary-hover);
 }
+
+/*
+ * --- Responsive navigation shell (Req 8.1) ---
+ * Phones (<600px) get a fixed bottom tab bar + a slim mobile header; wider
+ * viewports (>=600px) keep the original top navigation. The two are mutually
+ * exclusive, toggled purely by the breakpoint so no JS viewport measuring is
+ * needed. 600px is the `sm` token in styles/tokens.ts.
+ */
+
+/* Default (phone-first): show the mobile chrome, hide the desktop top nav. */
+.rm-desktop-nav {
+  display: none;
+}
+.rm-mobile-header {
+  display: flex;
+}
+.rm-bottom-nav {
+  display: flex;
+}
+
+/*
+ * Reserve space at the bottom so the fixed bottom bar never covers page
+ * content or a page's own action buttons. The bar is ~64px plus the device
+ * safe-area inset (home-indicator phones). Only applied on phones.
+ */
+@media (max-width: 599.98px) {
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  /* The renderer's A4 pages and print output must not inherit the bottom
+     padding when printing. */
+}
+
+/* The fixed bottom tab bar. */
+.rm-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0;
+  background: var(--rm-color-primary);
+  border-top: 1px solid var(--rm-color-primary-hover);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Each tab: a full-height, thumb-sized target with an icon over a short label. */
+.rm-bottom-nav__tab {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--rm-space-xs) 0;
+  border: 0;
+  background: transparent;
+  color: var(--rm-color-on-primary);
+  font-size: var(--rm-font-xs);
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+/* The active tab reads as selected: full opacity + a top accent strip. */
+.rm-bottom-nav__tab[aria-current="page"] {
+  opacity: 1;
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 0 var(--rm-color-on-primary);
+}
+
+/* The slim mobile header: app title on the left, a menu button on the right. */
+.rm-mobile-header {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rm-space-md);
+  padding: var(--rm-space-sm) var(--rm-space-lg);
+  background: var(--rm-color-primary);
+  color: var(--rm-color-on-primary);
+}
+
+/* The overflow menu opened from the mobile header (logout, admin preview). */
+.rm-mobile-menu {
+  position: absolute;
+  right: var(--rm-space-lg);
+  top: 56px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: var(--rm-space-xs);
+  border-radius: var(--rm-radius-md);
+  border: 1px solid var(--rm-color-border-subtle);
+  background: var(--rm-color-surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.rm-mobile-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--rm-space-sm);
+  min-height: var(--rm-tap-target);
+  padding: var(--rm-space-sm) var(--rm-space-md);
+  border: 0;
+  border-radius: var(--rm-radius-sm);
+  background: transparent;
+  color: var(--rm-color-text);
+  font-size: var(--rm-font-base);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Wider viewports: restore the original top nav, hide the mobile chrome. */
+@media (min-width: 600px) {
+  .rm-desktop-nav {
+    display: flex;
+  }
+  .rm-mobile-header,
+  .rm-bottom-nav {
+    display: none;
+  }
+}
+
+/* Never print the navigation chrome (also covered by .rm-no-print). */
+@media print {
+  .rm-desktop-nav,
+  .rm-mobile-header,
+  .rm-bottom-nav,
+  .rm-mobile-menu {
+    display: none !important;
+  }
+  body {
+    padding-bottom: 0;
+  }
+}
