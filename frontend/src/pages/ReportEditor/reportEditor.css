@@ -87,10 +87,17 @@
 .rm-report-section {
   margin-bottom: var(--rm-space-xl);
   break-inside: avoid;
+  /* Contain wide children (choice groups, tables) within the sheet width so
+     nothing overflows horizontally on a narrow screen. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .rm-report-section > h2 {
   break-after: avoid; /* keep a section heading with the field beneath it */
+  /* A long section title wraps instead of forcing the sheet wider. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /*
@@ -100,6 +107,8 @@
 .rm-report-field {
   margin-bottom: var(--rm-space-lg);
   break-inside: avoid;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* --- Print / export rules -------------------------------------------------- */

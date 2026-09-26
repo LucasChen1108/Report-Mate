@@ -63,18 +63,24 @@ export function FieldLabel({
       style={{
         display: "flex",
         alignItems: "baseline",
+        // Let the label + required hint wrap on a narrow screen instead of
+        // forcing the row (and the field) wider than the viewport.
+        flexWrap: "wrap",
         gap: spacing.sm,
         marginBottom: spacing.xs,
         fontSize: fontSize.sm,
         fontWeight: 600,
         color: colors.text,
+        minWidth: 0,
       }}
     >
-      {label}
+      <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+        {label}
+      </span>
       {required && (
         <span
           aria-hidden="true"
-          style={{ color: colors.dangerText, fontWeight: 700 }}
+          style={{ flexShrink: 0, color: colors.dangerText, fontWeight: 700 }}
           title="Required"
         >
           *
@@ -83,6 +89,7 @@ export function FieldLabel({
       {required && (
         <span
           style={{
+            flexShrink: 0,
             fontSize: fontSize.xs,
             fontWeight: 400,
             color: colors.textMuted,

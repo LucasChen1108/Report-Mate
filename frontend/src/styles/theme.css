@@ -161,11 +161,18 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: var(--rm-space-sm);
+  /* Allow the group to shrink inside a narrow column so its options wrap to the
+     next line rather than pushing past the field width. */
+  min-width: 0;
 }
 
 .rm-choice__option {
   min-width: var(--rm-tap-target);
   min-height: var(--rm-tap-target);
+  /* Never exceed the field's width: a long option label wraps inside the
+     button instead of overflowing the screen. */
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--rm-space-sm) var(--rm-space-md);
   font-size: var(--rm-font-base);
   border: 1px solid var(--rm-color-border);
@@ -173,6 +180,10 @@ textarea {
   background: var(--rm-color-surface);
   color: var(--rm-color-text);
   cursor: pointer;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rm-choice__option[aria-pressed="true"],
