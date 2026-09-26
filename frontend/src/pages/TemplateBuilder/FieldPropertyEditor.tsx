@@ -62,9 +62,19 @@ export function FieldPropertyEditor({
   return (
     <div
       data-testid={`field-property-editor-${field.id}`}
-      style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}
+      style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          // On a narrow screen the Required / Allow multiple toggles wrap to the
+          // next line instead of pushing the row off the right edge.
+          flexWrap: "wrap",
+          minWidth: 0,
+        }}
+      >
         <input
           type="text"
           value={draftLabel}
@@ -89,7 +99,11 @@ export function FieldPropertyEditor({
           }}
           onPointerDown={stopDnd}
           style={{
-            flex: 1,
+            // Grow to fill but allow shrinking below content width (minWidth:0)
+            // with a floor so it stays usable; box-sizing keeps padding inside.
+            flex: "1 1 140px",
+            minWidth: 0,
+            boxSizing: "border-box",
             minHeight: 44,
             fontSize: 16,
             padding: "8px 10px",
@@ -104,6 +118,7 @@ export function FieldPropertyEditor({
             gap: 6,
             fontSize: 14,
             minHeight: 44,
+            flexShrink: 0,
           }}
           onPointerDown={stopDnd}
         >
@@ -131,6 +146,7 @@ export function FieldPropertyEditor({
             gap: 6,
             fontSize: 14,
             minHeight: 44,
+            flexShrink: 0,
           }}
           onPointerDown={stopDnd}
         >

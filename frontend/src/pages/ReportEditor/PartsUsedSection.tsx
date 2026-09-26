@@ -65,9 +65,17 @@ export function PartsUsedSection({ parts, onChange }: PartsUsedSectionProps) {
           No parts recorded.
         </p>
       ) : (
+        <div style={{ maxWidth: "100%", overflowX: "auto", marginBottom: spacing.md }}>
         <table
           data-testid="parts-used-table"
-          style={{ width: "100%", borderCollapse: "collapse", marginBottom: spacing.md }}
+          style={{
+            width: "100%",
+            // A sensible minimum so the three inputs stay usable; on a phone the
+            // wrapper scrolls horizontally instead of the row overflowing the page.
+            minWidth: 320,
+            tableLayout: "fixed",
+            borderCollapse: "collapse",
+          }}
         >
           <thead>
             <tr>
@@ -137,6 +145,7 @@ export function PartsUsedSection({ parts, onChange }: PartsUsedSectionProps) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <button

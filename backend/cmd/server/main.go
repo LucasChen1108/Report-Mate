@@ -99,23 +99,16 @@ func run() error {
 	}
 	log.Printf("server: migrations up to date")
 
-	// Stores and handlers. Each domain package owns its own persistence; this
-	// file only hands each one the pool.
-	templatesHandler := templates.NewHandler(templates.NewPostgresStore(pool))
-	dashboardHandler := dashboard.NewHandler(pool)
-	reportsHandler := reports.NewHandler(pool)
-
 	// The agent handler builds its own gateway client from config, or leaves it
 	// nil when the gateway is unconfigured (cfg.AgentConfigured() is false), in
-	// which case the agent-fill endpoint answers 503 and the manual fill path
-	// keeps working. The chatClient interface is unexported by the agent
-	// package, so this file hands the raw URL/key/model to
-	// NewHandlerFromConfig and lets that package own the nil decision.
+	// which case the agent endpoints answer 503 and the manual fill path keeps
+	// working. The chatClient interface is unexported by the agent package, so
+	// this file hands the raw URL/key/model to NewHandlerFromConfig and lets
+	// that package own the nil decision.
 	//
-	// The two context providers now back the get_job_history and
-	// get_parts_catalog tools with real data (the jobs seed and the
-	// parts_catalog table), replacing the earlier Empty* defaults. Both satisfy
-	// the agent's provider interfaces and are read-only over the pool.
+	// The two context providers back the get_job_history and get_parts_catalog
+	// tools with real data (the jobs seed and the parts_catalog table). Both
+	// satisfy the agent's provider interfaces and are read-only over the pool.
 	agentHandler := agent.NewHandlerFromConfig(
 		pool,
 		cfg.LLMGatewayURL,
@@ -127,19 +120,12 @@ func run() error {
 		cfg.ConversationQuestionCap,
 	)
 
-	mux := http.NewServeMux()
-	templatesHandler.RegisterRoutes(mux)
-	dashboardHandler.RegisterRoutes(mux)
-	mountReports(mux, reportsHandler, agentHandler)
-
-	identity := auth.Install(mux, pool, cfg.JWTSigningKey)
-
-	// The identity middleware wraps the whole mux so every route — including
-	// the RBAC-gated template writes, which read the role back out of the
-	// request context — sees a populated identity.
+	// The whole route + middleware graph is composed in newApplicationHandler
+	// (also used by PostgreSQL-backed journey tests), so listener startup here
+	// stays a thin shell.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           newApplicationHandler(pool, cfg.IsProduction()),
+		Handler:           newApplicationHandler(pool, cfg.IsProduction(), agentHandler),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
@@ -152,7 +138,12 @@ func run() error {
 // newApplicationHandler composes the complete HTTP application. Keeping this
 // seam separate from listener startup lets PostgreSQL-backed journey tests use
 // the exact production route and middleware graph through httptest.
-func newApplicationHandler(pool *sql.DB, secureCookies bool) http.Handler {
+//
+// agentHandler is passed in (rather than built here) because it needs the
+// gateway config and the jobs/parts providers that run() resolves from config.
+// Its routes live under the /api/reports subtree, so it is mounted on the same
+// protected reports mux alongside the reports handler.
+func newApplicationHandler(pool *sql.DB, secureCookies bool, agentHandler *agent.Handler) http.Handler {
 	mux := http.NewServeMux()
 	sessions := auth.Install(mux, pool, secureCookies)
 
@@ -160,7 +151,7 @@ func newApplicationHandler(pool *sql.DB, secureCookies bool) http.Handler {
 	// below is mounted through the same database-backed session guard.
 	mountTemplates(mux, templates.NewHandler(templates.NewPostgresStore(pool)), sessions.Require)
 	mountDashboard(mux, dashboard.NewHandler(pool), sessions.Require)
-	mountReports(mux, reports.NewHandler(pool), sessions.Require)
+	mountReports(mux, reports.NewHandler(pool), agentHandler, sessions.Require)
 	accountapi.NewHandler(accounts.NewPostgresStore(pool), sessions.Require).RegisterRoutes(mux)
 
 	// The identity middleware wraps the whole mux so every route — including
@@ -193,9 +184,12 @@ func mountDashboard(root *http.ServeMux, handler *dashboard.Handler, requireAuth
 	root.Handle("/api/dashboard/", protected)
 }
 
-func mountReports(root *http.ServeMux, handler *reports.Handler, requireAuth routeMiddleware) {
+func mountReports(root *http.ServeMux, handler *reports.Handler, agentHandler *agent.Handler, requireAuth routeMiddleware) {
 	reportsMux := http.NewServeMux()
 	handler.RegisterRoutes(reportsMux)
+	// The agent's routes (POST /api/reports/{id}/agent-fill and /agent-chat)
+	// live under the same /api/reports subtree, so they mount on this mux and
+	// inherit the body limit and the session guard applied below.
 	agentHandler.RegisterRoutes(reportsMux)
 
 	limited := limitRequestBody(reportsMux, maxReportBodyBytes)

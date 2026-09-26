@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasChen1108/Report-Mate/backend/internal/agent"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
@@ -22,7 +23,10 @@ func TestEveryDomainRouteIsMountedBehindAuthentication(t *testing.T) {
 	}
 	mountTemplates(root, templates.NewHandler(nil), denied)
 	mountDashboard(root, dashboard.NewHandler(nil), denied)
-	mountReports(root, reports.NewHandler(nil), denied)
+	// Agent handler with no gateway configured (nil client) — the routing test
+	// only checks that the reports+agent subtree sits behind the auth guard.
+	agentHandler := agent.NewHandlerFromConfig(nil, "", "", "", agent.EmptyJobHistory{}, agent.EmptyPartsCatalog{}, 0, 0)
+	mountReports(root, reports.NewHandler(nil), agentHandler, denied)
 
 	routes := []struct{ method, path string }{
 		{http.MethodGet, "/api/templates"},
@@ -38,6 +42,8 @@ func TestEveryDomainRouteIsMountedBehindAuthentication(t *testing.T) {
 		{http.MethodPut, "/api/reports/11111111-1111-4111-8111-111111111111"},
 		{http.MethodPost, "/api/reports/11111111-1111-4111-8111-111111111111/save-and-export"},
 		{http.MethodGet, "/api/reports/11111111-1111-4111-8111-111111111111/export"},
+		{http.MethodPost, "/api/reports/11111111-1111-4111-8111-111111111111/agent-fill"},
+		{http.MethodPost, "/api/reports/11111111-1111-4111-8111-111111111111/agent-chat"},
 	}
 	for _, route := range routes {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {

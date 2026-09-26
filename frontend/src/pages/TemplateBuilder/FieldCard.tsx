@@ -80,6 +80,10 @@ export function FieldCard({ field, sectionId, dispatch }: FieldCardProps) {
     border: `1px solid ${colors.border}`,
     borderRadius: radius.md,
     background: colors.surface,
+    // Contain within the section/screen width and let the editor child shrink
+    // so its contents wrap instead of pushing the row off-screen.
+    minWidth: 0,
+    maxWidth: "100%",
   };
 
   return (
@@ -101,6 +105,7 @@ export function FieldCard({ field, sectionId, dispatch }: FieldCardProps) {
         data-testid={`field-drag-handle-${field.id}`}
         style={{
           ...tapTargetStyle, // >=44x44 CSS px (Req 8.2)
+          flexShrink: 0,
           cursor: "grab",
           touchAction: "none",
           fontSize: fontSize.base,
@@ -113,7 +118,10 @@ export function FieldCard({ field, sectionId, dispatch }: FieldCardProps) {
       >
         ⠿
       </button>
-      <span style={badgeStyle} data-testid={`field-type-${field.id}`}>
+      <span
+        style={{ ...badgeStyle, flexShrink: 0 }}
+        data-testid={`field-type-${field.id}`}
+      >
         {field.type}
       </span>
       <FieldPropertyEditor field={field} dispatch={dispatch} />
