@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ROUTES } from "../../config/routes";
 import { useTemplateDraft } from "../../contexts/TemplateDraftContext";
 import { getNavigatedTemplate } from "../../routing/navigationState";
+import type { ReportPreviewNavigationState } from "../../routing/navigationState";
 import type { TemplateRecord } from "../../services/contracts";
 import { useServices } from "../../services/ServiceProvider";
 import { TemplateBuilderPage } from "./TemplateBuilderPage";
@@ -13,11 +15,13 @@ interface TemplateBuilderRouteProps {
 interface ExistingTemplateBuilderRouteProps {
   onSchemaChange: ReturnType<typeof useTemplateDraft>["publishSchema"];
   onNameChange: ReturnType<typeof useTemplateDraft>["publishName"];
+  onPreview: () => void;
 }
 
 function ExistingTemplateBuilderRoute({
   onSchemaChange,
   onNameChange,
+  onPreview,
 }: ExistingTemplateBuilderRouteProps) {
   const { templates: templateService } = useServices();
   const { id } = useParams<"id">();
@@ -107,12 +111,23 @@ function ExistingTemplateBuilderRoute({
       initialTemplateId={record.id}
       onSchemaChange={onSchemaChange}
       onNameChange={onNameChange}
+      onPreview={onPreview}
     />
   );
 }
 
 export function TemplateBuilderRoute({ mode }: TemplateBuilderRouteProps) {
   const { publishSchema, publishName } = useTemplateDraft();
+  const navigate = useNavigate();
+
+  // "Preview report" opens the report editor on the current working draft. The
+  // draft is already published to the shared context via onSchemaChange/
+  // onNameChange as the builder is edited, so navigating with the preview state
+  // is all that's needed — the report editor renders the draft's schema.
+  const previewDraft = useCallback(() => {
+    const state: ReportPreviewNavigationState = { previewTemplateDraft: true };
+    navigate(ROUTES.generateReport, { state });
+  }, [navigate]);
 
   if (mode === "new") {
     return (
@@ -120,6 +135,7 @@ export function TemplateBuilderRoute({ mode }: TemplateBuilderRouteProps) {
         key="new"
         onSchemaChange={publishSchema}
         onNameChange={publishName}
+        onPreview={previewDraft}
       />
     );
   }
@@ -128,6 +144,7 @@ export function TemplateBuilderRoute({ mode }: TemplateBuilderRouteProps) {
     <ExistingTemplateBuilderRoute
       onSchemaChange={publishSchema}
       onNameChange={publishName}
+      onPreview={previewDraft}
     />
   );
 }
