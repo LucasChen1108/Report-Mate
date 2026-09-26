@@ -123,10 +123,6 @@ interface TemplateBuilderPageProps {
   // callers are unaffected.
   onSchemaChange?: (schema: TemplateSchema) => void;
   onNameChange?: (name: string) => void;
-  // Optional: called when the user activates "Preview report" in the SaveBar.
-  // The host (route) opens the report editor on the current working draft.
-  // Omitted -> no preview button is shown.
-  onPreview?: () => void;
 }
 
 export function TemplateBuilderPage({
@@ -135,7 +131,6 @@ export function TemplateBuilderPage({
   initialTemplateId,
   onSchemaChange,
   onNameChange,
-  onPreview,
 }: TemplateBuilderPageProps) {
   const { templates: templateService } = useServices();
   const [schema, rawDispatch] = useReducer(
@@ -363,7 +358,6 @@ export function TemplateBuilderPage({
           onSave={handleSave}
           saving={saving}
           status={saveStatus}
-          onPreview={onPreview}
         />
         {dirty && (
           <p data-testid="dirty-indicator" style={{ margin: "0 0 12px" }}>

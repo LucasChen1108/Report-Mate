@@ -36,9 +36,6 @@ interface SaveBarProps {
   saving: boolean;
   // What to surface in the status area (saved indicator or error).
   status: SaveStatus;
-  // Optional: called when the user activates "Preview report". The parent opens
-  // the report editor on the current working draft. Omitted -> no preview button.
-  onPreview?: () => void;
 }
 
 const controlStyle: CSSProperties = {
@@ -55,7 +52,6 @@ export function SaveBar({
   onSave,
   saving,
   status,
-  onPreview,
 }: SaveBarProps) {
   const hasError = status.kind === "error";
 
@@ -103,30 +99,6 @@ export function SaveBar({
       >
         {saving ? "Saving…" : "Save"}
       </button>
-
-      {/* Preview report — opens the report editor on the current working draft,
-          so the builder can see how a report from this template renders right
-          next to Save (the in-context, intuitive spot). Rendered only when the
-          parent wires onPreview. */}
-      {onPreview && (
-        <button
-          type="button"
-          onClick={onPreview}
-          disabled={saving}
-          data-testid="preview-report-button"
-          style={{
-            ...controlStyle,
-            minWidth: 44,
-            alignSelf: "flex-end",
-            cursor: saving ? "default" : "pointer",
-            background: "#fff",
-            color: "#1a5fb4",
-            border: "1px solid #1a5fb4",
-          }}
-        >
-          Preview report
-        </button>
-      )}
 
       {status.kind === "saved" && (
         <p
