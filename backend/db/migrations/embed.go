@@ -26,6 +26,11 @@ var FS embed.FS
 var developmentSeedFiles = map[string]struct{}{
 	"0009_seed_dev_users.sql":       {},
 	"0010_seed_dev_credentials.sql": {},
+	// 0012 seeds demo jobs assigned to the dev technician created by 0009, so it
+	// depends on a dev-only user and must not run in the production stream
+	// (0009 is excluded there, so its FK target does not exist). It is applied
+	// with the other seeds by cmd/devseed instead.
+	"0012_seed_jobs.sql": {},
 }
 
 // SchemaFS is the production-safe migration stream. Historical development
@@ -40,6 +45,7 @@ func DevelopmentSeedFiles() []string {
 	return []string{
 		"0009_seed_dev_users.sql",
 		"0010_seed_dev_credentials.sql",
+		"0012_seed_jobs.sql",
 	}
 }
 
