@@ -62,6 +62,15 @@ type Config struct {
 	// save-and-export and records its path in attachments.storage_key.
 	ExportDir string
 
+	// StaticDir is the directory of the built frontend (env STATIC_DIR), e.g.
+	// the frontend/dist produced by `npm run build`. When set, the server
+	// serves those files with SPA fallback to index.html for any path that is
+	// not an API/auth route. When blank (the default, and in dev/tests) the
+	// server is API-only and the frontend is served separately (Vite dev proxy
+	// locally). This is what lets one Lightsail process serve both the API and
+	// the app on a single origin, keeping cookie-session auth same-origin.
+	StaticDir string
+
 	// LLMGatewayURL is the base URL of the organizer-provided LLM gateway
 	// (env LLM_GATEWAY_URL), e.g. https://api.softwaresystems.app. The agent
 	// posts to {LLMGatewayURL}/v1/chat/completions. Optional: when blank the
@@ -112,6 +121,7 @@ func Load() (Config, error) {
 		Port:        valueOr(os.Getenv("PORT"), defaultPort),
 		Env:         valueOr(os.Getenv("ENV"), EnvDevelopment),
 		ExportDir:   valueOr(os.Getenv("EXPORT_DIR"), defaultExportDir),
+		StaticDir:   strings.TrimSpace(os.Getenv("STATIC_DIR")),
 
 		// The gateway URL and key are optional: the server must boot and serve
 		// the manual fill path with them unset (graceful degradation). LLMModel

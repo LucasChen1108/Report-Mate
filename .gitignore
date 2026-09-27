@@ -36,6 +36,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.local
 
 # ---- Runtime artifacts ----
@@ -52,3 +53,6 @@ coverage/
 # --- Login Feature Context File ---
 docs/auth-implementation-handoff.md
 docs/stage-b-backend-integration-assessment.md
+
+# ---- Release build output (scripts/build-release.sh) ----
+release/
