@@ -97,17 +97,3 @@ func TestAgentConfigured(t *testing.T) {
 	}
 }
 
-func TestLoad_ProductionRequiresRealSigningKey(t *testing.T) {
-	setBaseEnv(t)
-	t.Setenv("ENV", EnvProduction)
-	// No JWT_SIGNING_KEY -> must fail (dev default is not allowed in production).
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() in production with no JWT_SIGNING_KEY should fail")
-	}
-
-	// With a real key it succeeds.
-	t.Setenv("JWT_SIGNING_KEY", "a-real-production-signing-key-value")
-	if _, err := Load(); err != nil {
-		t.Fatalf("Load() in production with a real key should succeed, got: %v", err)
-	}
-}

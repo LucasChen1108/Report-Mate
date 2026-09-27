@@ -341,9 +341,12 @@ describe("preview modes", () => {
     expect(byTestId("field-fld_safety_checks")).toBeTruthy();
     expect(byTestId("field-fld_unit_photo")).toBeTruthy();
     expect(byTestId("field-fld_customer_signoff")).toBeTruthy();
-    // Nothing to save to, so both actions are disabled.
+    // Draft save needs an existing report, so it stays disabled in fixture
+    // mode. Save & Export IS enabled: on click it materializes a real report
+    // from the matching seeded template and exports it. No API call happens on
+    // render — only on activation.
     expect((byTestId("save-draft-button") as HTMLButtonElement).disabled).toBe(true);
-    expect((byTestId("save-and-export-button") as HTMLButtonElement).disabled).toBe(true);
+    expect((byTestId("save-and-export-button") as HTMLButtonElement).disabled).toBe(false);
     expect(saveReportMock).not.toHaveBeenCalled();
   });
 

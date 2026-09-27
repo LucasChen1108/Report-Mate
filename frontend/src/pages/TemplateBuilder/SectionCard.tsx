@@ -127,6 +127,11 @@ export function SectionCard({ section, dispatch }: SectionCardProps) {
     border: `2px solid ${colors.border}`,
     borderRadius: radius.lg,
     background: colors.surfaceMuted,
+    // Contain the card within the page width so its header/field rows never
+    // push past the screen edge.
+    minWidth: 0,
+    maxWidth: "100%",
+    overflowX: "hidden",
   };
 
   const fieldAreaStyle: React.CSSProperties = {
@@ -151,6 +156,7 @@ export function SectionCard({ section, dispatch }: SectionCardProps) {
           gap: spacing.md,
           padding: spacing.md,
           borderBottom: `1px solid ${colors.borderSubtle}`,
+          minWidth: 0,
         }}
       >
         {/*
@@ -164,6 +170,7 @@ export function SectionCard({ section, dispatch }: SectionCardProps) {
           data-testid={`section-drag-handle-${section.id}`}
           style={{
             ...tapTargetStyle,
+            flexShrink: 0,
             cursor: "grab",
             touchAction: "none",
             fontSize: fontSize.lg,
@@ -206,6 +213,8 @@ export function SectionCard({ section, dispatch }: SectionCardProps) {
           }}
           style={{
             flex: 1,
+            minWidth: 0,
+            boxSizing: "border-box",
             minHeight: tapTargetStyle.minHeight,
             fontSize: fontSize.lg,
             fontWeight: 600,
@@ -230,6 +239,7 @@ export function SectionCard({ section, dispatch }: SectionCardProps) {
           onClick={handleDeleteClick}
           style={{
             ...tapTargetStyle,
+            flexShrink: 0,
             border: `1px solid ${colors.danger}`,
             borderRadius: radius.md,
             background: colors.surface,

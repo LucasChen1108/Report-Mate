@@ -55,3 +55,11 @@ export function useTemplateDraft(): TemplateDraftContextValue {
   }
   return context;
 }
+
+// useTemplateDraftOptional reads the draft context WITHOUT requiring a provider,
+// returning null when none is present. Used by components (e.g. the report
+// editor route) that can render both inside the app shell (provider present)
+// and standalone in tests, where the builder draft is simply absent.
+export function useTemplateDraftOptional(): TemplateDraftContextValue | null {
+  return useContext(TemplateDraftContext);
+}

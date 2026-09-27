@@ -18,6 +18,7 @@ import (
 
 	"github.com/LucasChen1108/Report-Mate/backend/db/migrations"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/accounts"
+	"github.com/LucasChen1108/Report-Mate/backend/internal/agent"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/auth"
 	database "github.com/LucasChen1108/Report-Mate/backend/internal/db"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/security"
@@ -54,7 +55,12 @@ func TestStageBPostgresHTTPJourneys(t *testing.T) {
 		}
 	}
 
-	app := newApplicationHandler(pool, false)
+	// A no-gateway agent handler: this journey exercises auth/reports/etc., not
+	// the agent, so the gateway is left unconfigured (nil client). Its routes
+	// still mount, matching the production route graph.
+	testAgent := agent.NewHandlerFromConfig(pool, "", "", "", agent.EmptyJobHistory{}, agent.EmptyPartsCatalog{}, 0, 0)
+
+	app := newApplicationHandler(pool, false, testAgent)
 	adminOneCode := createAdminCode(t, pool, store, companyOne.ID, "ADMIN-ONE-"+suffix, now.Add(time.Hour), false)
 	adminOnePersonal := "admin.one." + suffix + "@example.test"
 	adminOneCompany := "admin.one." + suffix + "@company.test"
@@ -74,7 +80,7 @@ func TestStageBPostgresHTTPJourneys(t *testing.T) {
 	adminOneCookie = companyLogin
 
 	// Production composition must issue the same opaque cookie with Secure set.
-	productionLogin := doJSON(t, newApplicationHandler(pool, true), http.MethodPost, "/auth/login", map[string]any{
+	productionLogin := doJSON(t, newApplicationHandler(pool, true, testAgent), http.MethodPost, "/auth/login", map[string]any{
 		"email": adminOneCompany, "password": journeyPassword,
 	}, nil)
 	assertStatus(t, productionLogin, http.StatusOK)

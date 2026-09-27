@@ -49,9 +49,11 @@ import {
   ApiAuthorizationError,
   ApiError,
   ApiValidationError,
+  createReport,
   saveAndExportReport,
   saveReport,
 } from "../../api/reports";
+import { listTemplates } from "../../api/templates";
 import { colors, fontSize, radius, spacing } from "../../styles/tokens";
 import { A4Document, A4Page, ReportHeader } from "./A4Document";
 import { ConversationPanel } from "./ConversationPanel";
@@ -112,8 +114,12 @@ export function ReportEditorPage({
 
   const usingReport = report !== undefined;
   const usingExternal = !usingReport && externalSchema !== undefined;
-  // Saving needs a report id; the other two modes are preview/dev harnesses.
+  // Draft save needs an existing report id (report mode only).
   const canSave = usingReport;
+  // Export works in report mode AND fixture mode: in fixture mode the export
+  // handler materializes a real report from the matching seeded template first.
+  // Only the external (builder) preview cannot export.
+  const canExport = !usingExternal;
 
   // --- Mode: fixture ---------------------------------------------------------
   // Which seed template the dev harness has loaded. Defaults to HVAC (the only
@@ -345,8 +351,48 @@ export function ReportEditorPage({
   // Steps 3 and 4 must not be swapped. Navigating first unmounts the document
   // out from under the print preview and the user prints a blank dashboard, so
   // the navigation waits for the print dialog to resolve.
+  // resolveExportTarget returns the report id + templateId to export against.
+  //   - report mode: the already-loaded report.
+  //   - fixture mode: no report exists yet, so materialize one — look up the
+  //     seeded template whose name matches the fixture and create a real draft
+  //     from it. This is what makes Save & Export work from the generate-report
+  //     fixture page (the content the user filled is then persisted + exported).
+  // Returns null (after setting an error) when a fixture cannot be matched to a
+  // seeded template, so the caller aborts cleanly.
+  const resolveExportTarget = async (): Promise<
+    { reportId: string; templateId: string } | null
+  > => {
+    if (report) {
+      return { reportId: report.id, templateId: report.templateId };
+    }
+    if (!usingReport && !usingExternal) {
+      // Fixture mode: match this fixture to its seeded template by name.
+      const templates = await listTemplates();
+      const match = templates.find((t) => t.name === fixture.name);
+      if (!match) {
+        setStatus({
+          kind: "error",
+          message: `No saved template named "${fixture.name}" was found to export against.`,
+        });
+        return null;
+      }
+      const created = await createReport({
+        templateId: match.id,
+        customerName: customerName.trim() || undefined,
+      });
+      return { reportId: created.id, templateId: created.templateId };
+    }
+    // External (builder preview) mode has no persistable template id.
+    setStatus({
+      kind: "error",
+      message: "This is a live builder preview — save the template first to export a report from it.",
+    });
+    return null;
+  };
+
   const handleSaveAndExport = async () => {
-    if (!report || busy !== "none") return;
+    // Allow report mode and fixture mode; external preview cannot export.
+    if (busy !== "none" || usingExternal) return;
 
     const missing = findMissingRequiredFields(schema, content);
     if (missing.length > 0) {
@@ -366,8 +412,22 @@ export function ReportEditorPage({
     setBusy("export");
     setStatus({ kind: "idle" });
     setHighlightedId(null);
+
+    let target: { reportId: string; templateId: string } | null;
     try {
-      await saveAndExportReport(report.id, savePayload());
+      target = await resolveExportTarget();
+    } catch (err) {
+      reportFailure(err);
+      setBusy("none");
+      return;
+    }
+    if (!target) {
+      setBusy("none");
+      return;
+    }
+
+    try {
+      await saveAndExportReport(target.reportId, savePayload());
     } catch (err) {
       reportFailure(err);
       setBusy("none");
@@ -377,7 +437,7 @@ export function ReportEditorPage({
     // Saved. Print, wait for the dialog to close, then leave.
     await printAndWait();
     navigate(
-      `/dashboard/templates/${encodeURIComponent(report.templateId)}?highlight=${encodeURIComponent(report.id)}`,
+      `/dashboard/templates/${encodeURIComponent(target.templateId)}?highlight=${encodeURIComponent(target.reportId)}`,
     );
   };
 
@@ -479,20 +539,24 @@ export function ReportEditorPage({
             type="button"
             data-testid="save-and-export-button"
             onClick={() => void handleSaveAndExport()}
-            disabled={!canSave || working}
-            title={canSave ? undefined : "Preview mode — there is no report to save to."}
+            disabled={!canExport || working}
+            title={
+              canExport
+                ? undefined
+                : "Builder preview — save the template first to export a report."
+            }
             style={{
               minHeight: 44,
               padding: `${spacing.sm}px ${spacing.lg}px`,
               fontSize: fontSize.base,
               borderRadius: radius.md,
-              background: !canSave || working ? colors.textMuted : colors.primary,
+              background: !canExport || working ? colors.textMuted : colors.primary,
               color: colors.onPrimary,
-              border: `1px solid ${!canSave || working ? colors.textMuted : colors.primaryHover}`,
-              cursor: !canSave || working ? "default" : "pointer",
+              border: `1px solid ${!canExport || working ? colors.textMuted : colors.primaryHover}`,
+              cursor: !canExport || working ? "default" : "pointer",
             }}
           >
-            {busy === "export" ? "Saving…" : "Save and Export"}
+            {busy === "export" ? "Exporting…" : "Save and Export"}
           </button>
         </div>
 
@@ -545,7 +609,9 @@ export function ReportEditorPage({
               color: colors.textMuted,
             }}
           >
-            Preview mode — no report is loaded, so saving is disabled.
+            {usingExternal
+              ? "Builder preview — save the template first to export a report from it."
+              : "Fill in the fields and use Save and Export to create and export a report. (Draft save needs an existing report.)"}
           </p>
         )}
       </div>
