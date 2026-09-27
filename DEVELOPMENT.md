@@ -41,14 +41,23 @@ cd backend
 export DATABASE_URL="postgres://reportmate:reportmate@127.0.0.1:5544/reportmate?sslmode=disable"
 go run ./cmd/server
 
-# 3. Frontend, in a second terminal.
+# 3. Seed the development logins (development only). Migration 0011 disables
+#    the historical seeded credentials, so a fresh database has NO usable login
+#    until you run this. It restores the two dev accounts below.
+cd backend
+export DATABASE_URL="postgres://reportmate:reportmate@127.0.0.1:5544/reportmate?sslmode=disable"
+go run ./cmd/devseed
+
+# 4. Frontend, in a second terminal. VITE_AUTH_MODE=api points it at the real
+#    backend auth (cookie sessions); without it the app runs in mock mode.
 cd frontend
 npm install
+printf 'VITE_AUTH_MODE=api\nVITE_API_BASE_URL=\n' > .env.local
 npm run dev
 ```
 
 Open <http://localhost:5173> and sign in as
-`dispatch@reportmate.local` / `reportmate-dev`.
+`dispatch@reportmate.local` / `reportmate-dev` (after running `cmd/devseed`).
 
 **Why 5544 and not 5432.** If you already run Postgres locally — Homebrew's
 `postgresql@16`, say — it owns 5432, and pointing the app at it would mix
@@ -138,6 +147,9 @@ reads (`backend/internal/config/config.go`).
 | `ENV` | no | `development` | `development` or `production`. |
 | `JWT_SIGNING_KEY` | no in dev, **yes in prod** | a published dev key | HMAC secret session tokens are signed with. In development the server falls back to a key that is committed in this repository, so a fresh clone can log in with nothing configured. `ENV=production` **refuses to start** with that fallback — generate a real one with `openssl rand -base64 48`. |
 | `EXPORT_DIR` | no | `./var/exports` | Where save-and-export writes its rendered HTML snapshot. Relative to the server's working directory, so running from `backend/` puts them in `backend/var/exports/`. `var/` is gitignored. |
+| `STATIC_DIR` | no | *(empty)* | Directory of the built frontend (`frontend/dist`) for the backend to serve as an SPA on the same origin. Empty in dev; set in production. |
+
+The **frontend** reads its own variables via Vite from `frontend/.env.local`: set `VITE_AUTH_MODE=api` to use the real backend auth, and leave `VITE_API_BASE_URL` empty to use the dev proxy.
 
 The server never logs `DATABASE_URL` or `JWT_SIGNING_KEY`. Keep it that way —
 both are credentials.
@@ -189,8 +201,16 @@ re-run, and your database and everyone else's will quietly disagree.
 
 ## The two dev logins
 
-Migrations `0009_seed_dev_users.sql` and `0010_seed_dev_credentials.sql` seed
-two accounts. Both use the password `reportmate-dev`.
+Two development accounts, both with the password `reportmate-dev`. **They are
+not seeded automatically anymore:** migration `0011_disable_legacy_dev_credentials.sql`
+disables the historical seeded credentials, and the seed files are excluded from
+the normal migration stream. Install them explicitly (development only):
+
+```bash
+cd backend
+export DATABASE_URL="postgres://reportmate:reportmate@127.0.0.1:5544/reportmate?sslmode=disable"
+go run ./cmd/devseed
+```
 
 | Email | Password | Role | Use it to see |
 | --- | --- | --- | --- |
@@ -217,13 +237,14 @@ in-flight requests for up to 15 seconds.
 Quick check that it is alive and the seeds landed:
 
 ```bash
-curl -s -X POST localhost:8080/api/auth/login \
+curl -s -i -X POST localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"dispatch@reportmate.local","password":"reportmate-dev"}'
 ```
 
-A JSON body with a `token` and a `user` means the database, the migrations and
-the seeds are all good.
+Auth uses an opaque **session cookie**, not a bearer token: a `200` with a
+`Set-Cookie` header (and a JSON user body) means everything is good. A `401`
+usually means you have not run `cmd/devseed` yet.
 
 ### Frontend
 
