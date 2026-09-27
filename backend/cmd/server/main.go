@@ -35,8 +35,8 @@ import (
 	"github.com/LucasChen1108/Report-Mate/backend/internal/config"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/dashboard"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/db"
-	appmiddleware "github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/jobs"
+	appmiddleware "github.com/LucasChen1108/Report-Mate/backend/internal/middleware"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/parts"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/reports"
 	"github.com/LucasChen1108/Report-Mate/backend/internal/templates"
@@ -125,7 +125,7 @@ func run() error {
 	// stays a thin shell.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           newApplicationHandler(pool, cfg.IsProduction(), agentHandler),
+		Handler:           newApplicationHandler(pool, cfg.IsProduction(), cfg.StaticDir, agentHandler),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
@@ -143,7 +143,7 @@ func run() error {
 // gateway config and the jobs/parts providers that run() resolves from config.
 // Its routes live under the /api/reports subtree, so it is mounted on the same
 // protected reports mux alongside the reports handler.
-func newApplicationHandler(pool *sql.DB, secureCookies bool, agentHandler *agent.Handler) http.Handler {
+func newApplicationHandler(pool *sql.DB, secureCookies bool, staticDir string, agentHandler *agent.Handler) http.Handler {
 	mux := http.NewServeMux()
 	sessions := auth.Install(mux, pool, secureCookies)
 
@@ -153,6 +153,16 @@ func newApplicationHandler(pool *sql.DB, secureCookies bool, agentHandler *agent
 	mountDashboard(mux, dashboard.NewHandler(pool), sessions.Require)
 	mountReports(mux, reports.NewHandler(pool), agentHandler, sessions.Require)
 	accountapi.NewHandler(accounts.NewPostgresStore(pool), sessions.Require).RegisterRoutes(mux)
+
+	// When a built frontend is configured (production: STATIC_DIR points at
+	// frontend/dist), serve it as the catch-all so the same origin serves both
+	// the API and the app — which keeps the session cookie same-origin. The
+	// "/" pattern is the least specific, so every "/api" and "/auth" route
+	// still matches first. In dev/tests staticDir is empty and this is skipped,
+	// leaving the API-only handler the Vite dev server proxies to.
+	if staticDir != "" {
+		mux.Handle("/", spaFileServer(staticDir))
+	}
 
 	// The identity middleware wraps the whole mux so every route — including
 	// the RBAC-gated template writes, which read the role back out of the

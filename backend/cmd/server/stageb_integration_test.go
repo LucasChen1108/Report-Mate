@@ -60,7 +60,7 @@ func TestStageBPostgresHTTPJourneys(t *testing.T) {
 	// still mount, matching the production route graph.
 	testAgent := agent.NewHandlerFromConfig(pool, "", "", "", agent.EmptyJobHistory{}, agent.EmptyPartsCatalog{}, 0, 0)
 
-	app := newApplicationHandler(pool, false, testAgent)
+	app := newApplicationHandler(pool, false, "", testAgent)
 	adminOneCode := createAdminCode(t, pool, store, companyOne.ID, "ADMIN-ONE-"+suffix, now.Add(time.Hour), false)
 	adminOnePersonal := "admin.one." + suffix + "@example.test"
 	adminOneCompany := "admin.one." + suffix + "@company.test"
@@ -80,7 +80,7 @@ func TestStageBPostgresHTTPJourneys(t *testing.T) {
 	adminOneCookie = companyLogin
 
 	// Production composition must issue the same opaque cookie with Secure set.
-	productionLogin := doJSON(t, newApplicationHandler(pool, true, testAgent), http.MethodPost, "/auth/login", map[string]any{
+	productionLogin := doJSON(t, newApplicationHandler(pool, true, "", testAgent), http.MethodPost, "/auth/login", map[string]any{
 		"email": adminOneCompany, "password": journeyPassword,
 	}, nil)
 	assertStatus(t, productionLogin, http.StatusOK)
